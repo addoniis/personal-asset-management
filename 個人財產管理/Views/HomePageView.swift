@@ -121,12 +121,17 @@ extension AssetCategory {
             return .purple
         case .insurance:
             return .red
+        case .mortgage:
+            return .brown
         case .other:
             return .gray
         }
     }
 }
 
-#Preview {
-    HomePageView()
+struct HomePageView_Previews: PreviewProvider {
+    static var previews: some View {
+        HomePageView()
+            .environmentObject(AssetManager.shared)
+    }
 }
