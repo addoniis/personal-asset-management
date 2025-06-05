@@ -17,10 +17,10 @@ struct AssetEditView: View {
         self.asset = asset
         self.onDelete = onDelete
         _assetName = State(initialValue: asset.name)
-        _amount = State(initialValue: String(format: "%.2f", asset.amount))
+        _amount = State(initialValue: String(format: "%.2f", asset.value))
         _category = State(initialValue: asset.category)
-        _date = State(initialValue: asset.date)
-        _notes = State(initialValue: asset.notes)
+        _date = State(initialValue: asset.createdAt)
+        _notes = State(initialValue: asset.additionalInfo["notes"]?.string ?? "")
     }
 
     var body: some View {
@@ -35,11 +35,12 @@ struct AssetEditView: View {
                 if let amountValue = Double(amount) {
                     let updatedAsset = Asset(
                         id: asset.id,
-                        name: assetName,
-                        amount: amountValue,
                         category: category,
-                        date: date,
-                        notes: notes
+                        name: assetName,
+                        value: amountValue,
+                        additionalInfo: ["notes": .string(notes)],
+                        createdAt: date,
+                        updatedAt: Date()
                     )
                     assetManager.updateAsset(updatedAsset)
                     dismiss()
@@ -79,11 +80,12 @@ struct AssetEditView: View {
     AssetEditView(
         asset: Asset(
             id: UUID(),
-            name: "測試資產",
-            amount: 1000000,
             category: .property,
-            date: Date(),
-            notes: "測試備註"
+            name: "測試資產",
+            value: 1000000,
+            additionalInfo: ["notes": .string("測試備註")],
+            createdAt: Date(),
+            updatedAt: Date()
         )
     ) { }
 }

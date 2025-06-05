@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HomePageView: View {
-    @StateObject private var assetManager = AssetManager.shared
+    @EnvironmentObject var assetManager: AssetManager
     @State private var showingAddAsset = false
     @State private var showingAnalytics = false
     @State private var selectedTimeRange = 1 // 1: 月, 3: 季, 12: 年
@@ -129,9 +129,7 @@ extension AssetCategory {
     }
 }
 
-struct HomePageView_Previews: PreviewProvider {
-    static var previews: some View {
-        HomePageView()
-            .environmentObject(AssetManager.shared)
-    }
+#Preview {
+    HomePageView()
+        .environmentObject(AssetManager.shared)
 }

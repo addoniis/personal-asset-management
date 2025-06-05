@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct TaiwanStockView: View {
+    @EnvironmentObject var assetManager: AssetManager
+
     var body: some View {
         List {
             Section(header: Text("台股")) {
@@ -15,4 +17,5 @@ struct TaiwanStockView: View {
 
 #Preview {
     TaiwanStockView()
+        .environmentObject(AssetManager.shared)
 }

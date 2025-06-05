@@ -1,15 +1,15 @@
 import SwiftUI
 
 struct PropertyView: View {
-    @StateObject private var assetManager = AssetManager.shared
+    @EnvironmentObject private var assetManager: AssetManager
     @State private var showingAddProperty = false
 
     private var propertyAssets: [Asset] {
-        assetManager.assets.filter { $0.category == .property }
+        assetManager.assets(for: .property)
     }
 
     private var totalPropertyValue: Double {
-        propertyAssets.reduce(0) { $0 + $1.amount }
+        assetManager.totalValue(for: .property)
     }
 
     var body: some View {
@@ -21,7 +21,7 @@ struct PropertyView: View {
                         title: "總房地產資產",
                         amount: totalPropertyValue,
                         trend: assetManager.getGrowthRate(for: .property),
-                        color: AssetCategory.property.color
+                        color: AssetCategory.property.displayColor
                     )
                     .padding(.horizontal)
 
@@ -57,6 +57,7 @@ struct PropertyView: View {
             }
             .sheet(isPresented: $showingAddProperty) {
                 AddPropertyView()
+                    .environmentObject(assetManager)
             }
         }
     }
@@ -76,15 +77,15 @@ struct PropertyCard: View {
                     Text("當前價值")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    Text("$\(String(format: "%.2f", property.amount))")
+                    Text("$\(String(format: "%.2f", property.value))")
                         .font(.title2)
                         .fontWeight(.bold)
                 }
 
                 Spacer()
 
-                if !property.notes.isEmpty {
-                    Text(property.notes)
+                if let notes = property.additionalInfo["notes"]?.string {
+                    Text(notes)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -100,7 +101,7 @@ struct PropertyCard: View {
 // 新增房地產視圖
 struct AddPropertyView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var assetManager = AssetManager.shared
+    @EnvironmentObject private var assetManager: AssetManager
     @State private var propertyName = ""
     @State private var amount = ""
     @State private var date = Date()
@@ -108,24 +109,36 @@ struct AddPropertyView: View {
 
     var body: some View {
         NavigationView {
-            AssetInputForm(
-                assetName: $propertyName,
-                amount: $amount,
-                category: .constant(.property),
-                date: $date,
-                notes: $notes
-            ) {
-                if let amountValue = Double(amount) {
-                    let property = Asset(
-                        id: UUID(),
-                        name: propertyName,
-                        amount: amountValue,
-                        category: .property,
-                        date: date,
-                        notes: notes
-                    )
-                    assetManager.addAsset(property)
-                    dismiss()
+            Form {
+                Section(header: Text("基本資訊")) {
+                    TextField("名稱", text: $propertyName)
+                    TextField("價值", text: $amount)
+                        .keyboardType(.decimalPad)
+                    DatePicker("日期", selection: $date, displayedComponents: .date)
+                }
+
+                Section(header: Text("備註")) {
+                    TextEditor(text: $notes)
+                        .frame(height: 100)
+                }
+
+                Section {
+                    Button("儲存") {
+                        if let amountValue = Double(amount) {
+                            let property = Asset(
+                                id: UUID(),
+                                category: .property,
+                                name: propertyName,
+                                value: amountValue,
+                                additionalInfo: ["notes": .string(notes)],
+                                createdAt: date,
+                                updatedAt: date
+                            )
+                            assetManager.addAsset(property)
+                            dismiss()
+                        }
+                    }
+                    .disabled(propertyName.isEmpty || amount.isEmpty)
                 }
             }
             .navigationTitle("新增房地產")
@@ -143,4 +156,5 @@ struct AddPropertyView: View {
 
 #Preview {
     PropertyView()
+        .environmentObject(AssetManager.shared)
 }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 class StorageManager {
     static let shared = StorageManager()
@@ -9,24 +10,21 @@ class StorageManager {
 
     private init() {}
 
-    func saveAssets(_ assets: [Asset]) {
-        if let encoded = try? JSONEncoder().encode(assets) {
-            userDefaults.set(encoded, forKey: assetsKey)
-        }
+    func saveAssets(_ assets: [Asset]) throws {
+        let encoded = try JSONEncoder().encode(assets)
+        userDefaults.set(encoded, forKey: assetsKey)
     }
 
-    func loadAssets() -> [Asset] {
-        guard let data = userDefaults.data(forKey: assetsKey),
-              let assets = try? JSONDecoder().decode([Asset].self, from: data) else {
+    func loadAssets() throws -> [Asset] {
+        guard let data = userDefaults.data(forKey: assetsKey) else {
             return []
         }
-        return assets
+        return try JSONDecoder().decode([Asset].self, from: data)
     }
 
-    func saveAssetHistory(_ history: [AssetManager.AssetHistory]) {
-        if let encoded = try? JSONEncoder().encode(history) {
-            userDefaults.set(encoded, forKey: historyKey)
-        }
+    func saveAssetHistory(_ history: [AssetManager.AssetHistory]) throws {
+        let encoded = try JSONEncoder().encode(history)
+        userDefaults.set(encoded, forKey: historyKey)
     }
 
     func loadAssetHistory() -> [AssetManager.AssetHistory] {
@@ -42,28 +40,31 @@ class StorageManager {
         userDefaults.removeObject(forKey: historyKey)
     }
 
-    func exportData() -> Data? {
-        let assets = loadAssets()
-        let history = loadAssetHistory()
+    func createBackup() throws -> URL {
+        let exportData = ExportData(
+            assets: try loadAssets(),
+            history: loadAssetHistory()
+        )
+        let encoded = try JSONEncoder().encode(exportData)
 
-        let exportData = ExportData(assets: assets, history: history)
-        return try? JSONEncoder().encode(exportData)
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let backupURL = documentsDirectory.appendingPathComponent("asset_backup_\(Date()).json")
+        try encoded.write(to: backupURL)
+        return backupURL
     }
 
-    func importData(_ data: Data) -> Bool {
-        guard let importData = try? JSONDecoder().decode(ExportData.self, from: data) else {
-            return false
-        }
-
-        saveAssets(importData.assets)
-        saveAssetHistory(importData.history)
-        return true
+    func restoreFromBackup(at url: URL) throws {
+        let data = try Data(contentsOf: url)
+        let importData = try JSONDecoder().decode(ExportData.self, from: data)
+        try saveAssets(importData.assets)
+        try saveAssetHistory(importData.history)
     }
+}
 
-    private struct ExportData: Codable {
-        let assets: [Asset]
-        let history: [AssetManager.AssetHistory]
-    }
+// MARK: - Supporting Types
+private struct ExportData: Codable {
+    let assets: [Asset]
+    let history: [AssetManager.AssetHistory]
 }
 
 // MARK: - Errors

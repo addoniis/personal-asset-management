@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CaseView: View {
+    @EnvironmentObject var assetManager: AssetManager
+
     var body: some View {
         NavigationView {
             VStack {
@@ -19,4 +21,5 @@ struct CaseView: View {
 
 #Preview {
     CaseView()
+        .environmentObject(AssetManager.shared)
 }

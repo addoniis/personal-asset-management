@@ -1,27 +1,5 @@
 import Foundation
-
-// MARK: - Enums
-enum AssetCategory: String, CaseIterable, Codable {
-    case cash = "現金"
-    case stock = "股票"
-    case fund = "基金"
-    case insurance = "儲蓄險"
-    case property = "房產"
-    case mortgage = "房貸"
-    case other = "其他"
-
-    var icon: String {
-        switch self {
-        case .cash: return "dollarsign.circle"
-        case .stock: return "chart.line.uptrend.xyaxis"
-        case .fund: return "chart.pie"
-        case .insurance: return "shield"
-        case .property: return "house"
-        case .mortgage: return "banknote"
-        case .other: return "ellipsis.circle"
-        }
-    }
-}
+import SwiftUI
 
 // MARK: - Models
 struct Asset: Codable, Identifiable {
@@ -39,6 +17,28 @@ enum AdditionalInfoValue: Codable {
     case string(String)
     case integer(Int)
     case double(Double)
+
+    // 便利访問器
+    var string: String? {
+        if case .string(let value) = self {
+            return value
+        }
+        return nil
+    }
+
+    var integer: Int? {
+        if case .integer(let value) = self {
+            return value
+        }
+        return nil
+    }
+
+    var double: Double? {
+        if case .double(let value) = self {
+            return value
+        }
+        return nil
+    }
 
     // Custom coding keys for type safety
     private enum CodingKeys: String, CodingKey {

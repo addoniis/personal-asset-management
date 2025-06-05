@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 class AssetManager: ObservableObject {
     static let shared = AssetManager()
@@ -12,21 +13,28 @@ class AssetManager: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    struct AssetHistory: Identifiable {
-        let id = UUID()
+    struct AssetHistory: Codable, Identifiable {
+        let id: UUID
         let date: Date
         let totalValue: Double
         let growthRate: Double
+
+        init(id: UUID = UUID(), date: Date, totalValue: Double, growthRate: Double) {
+            self.id = id
+            self.date = date
+            self.totalValue = totalValue
+            self.growthRate = growthRate
+        }
     }
 
     var totalAssets: Double {
-        assets.reduce(0) { $0 + $1.amount }
+        assets.reduce(0) { $0 + $1.value }
     }
 
     var assetsByCategory: [AssetCategory: Double] {
         Dictionary(grouping: assets, by: { $0.category })
             .mapValues { assets in
-                assets.reduce(0) { $0 + $1.amount }
+                assets.reduce(0) { $0 + $1.value }
             }
     }
 
@@ -74,6 +82,7 @@ class AssetManager: ObservableObject {
             assets = try storageManager.loadAssets()
         } catch {
             self.error = error.localizedDescription
+            assets = []
         }
 
         isLoading = false
@@ -98,7 +107,11 @@ class AssetManager: ObservableObject {
             growthRate: monthlyGrowthRate
         )
         assetHistory.append(newHistory)
-        storageManager.saveAssetHistory(assetHistory)
+        do {
+            try storageManager.saveAssetHistory(assetHistory)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     // MARK: - Filtering & Sorting
@@ -121,6 +134,29 @@ class AssetManager: ObservableObject {
         loadAssets()
     }
 
+    func getAssetHistory(for category: AssetCategory, months: Int) -> [AssetHistory] {
+        let filtered = assetHistory.filter { history in
+            guard let cutoffDate = Calendar.current.date(byAdding: .month, value: -months, to: Date()) else {
+                return false
+            }
+            return history.date >= cutoffDate
+        }
+        return filtered.sorted { $0.date < $1.date }
+    }
+
+    func getGrowthRate(for category: AssetCategory) -> Double {
+        guard let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: Date()) else { return 0 }
+        let currentValue = assetsByCategory[category] ?? 0
+
+        let lastMonthAssets = assetHistory.first { history in
+            Calendar.current.isDate(history.date, equalTo: lastMonth, toGranularity: .month)
+        }
+        guard let lastMonthValue = lastMonthAssets?.totalValue, lastMonthValue > 0 else { return 0 }
+
+        return ((currentValue - lastMonthValue) / lastMonthValue) * 100
+    }
+
+    // MARK: - Analytics Methods
     func getAssetHistory(months: Int) -> [AssetHistory] {
         let filtered = assetHistory.filter { history in
             guard let cutoffDate = Calendar.current.date(byAdding: .month, value: -months, to: Date()) else {
@@ -148,18 +184,6 @@ class AssetManager: ObservableObject {
             ))
         }
         return growthHistory
-    }
-
-    func getGrowthRate(for category: AssetCategory) -> Double {
-        guard let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: Date()) else { return 0 }
-        let currentValue = assetsByCategory[category] ?? 0
-
-        let lastMonthAssets = assetHistory.first { history in
-            Calendar.current.isDate(history.date, equalTo: lastMonth, toGranularity: .month)
-        }
-        guard let lastMonthValue = lastMonthAssets?.totalValue, lastMonthValue > 0 else { return 0 }
-
-        return ((currentValue - lastMonthValue) / lastMonthValue) * 100
     }
 }
 

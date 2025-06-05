@@ -55,12 +55,12 @@ struct AssetTrendChartView: View {
 #Preview {
     let calendar = Calendar.current
     let today = Date()
-    let data = (0..<6).map { i in
+    let data = Array((0..<6).map { i in
         AssetTrendChartView.DataPoint(
             date: calendar.date(byAdding: .month, value: -i, to: today)!,
             value: Double.random(in: 90000...110000)
         )
-    }.reversed()
+    }.reversed())
 
     return AssetTrendChartView(data: data, title: "資產趨勢")
         .padding()
