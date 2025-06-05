@@ -1,46 +1,63 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var assetManager = AssetManager.shared
+    @StateObject private var assetManager = AssetManager()
+    @State private var selectedTab = 0
+
+    private var totalAssets: Double {
+        assetManager.totalAssets
+    }
 
     var body: some View {
-        TabView {
-            // 首頁
-            HomePageView()
-                .environmentObject(assetManager)
-                .tabItem {
-                    Label("首頁", systemImage: "house.fill")
-                }
-            // 現金
-            CaseView()
-                .environmentObject(assetManager)
-                .tabItem {
-                    Label("現金", systemImage: "dollarsign.ring")
-                }
+        VStack(spacing: 0) {
+            // 總資產顯示
+            VStack {
+                Text("總資產")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text("$\(Int(totalAssets))")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.blue)
+            }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(Color(UIColor.systemBackground))
 
-            // 股票
-            StockView()
-                .environmentObject(assetManager)
-                .tabItem {
-                    Label("股票", systemImage: "chart.line.uptrend.xyaxis")
-                }
+            // TabView
+            TabView(selection: $selectedTab) {
+                CaseView()
+                    .tabItem {
+                        Label("現金", systemImage: "dollarsign.circle")
+                    }
+                    .tag(0)
 
-            // 房產
-            PropertyView()
-                .environmentObject(assetManager)
-                .tabItem {
-                    Label("房產", systemImage: "house.lodge.fill")
-                }
+                StockView()
+                    .tabItem {
+                        Label("股票", systemImage: "chart.line.uptrend.xyaxis")
+                    }
+                    .tag(1)
 
-            // 我的
-            MyPageView()
-                .environmentObject(assetManager)
-                .tabItem {
-                    Label("我的", systemImage: "person.crop.circle.fill")
-                }
+                PropertyView()
+                    .tabItem {
+                        Label("房產", systemImage: "house")
+                    }
+                    .tag(2)
+
+                InsuranceView()
+                    .tabItem {
+                        Label("保險", systemImage: "heart.text.square")
+                    }
+                    .tag(3)
+
+                ProfileView()
+                    .tabItem {
+                        Label("我的", systemImage: "person.circle")
+                    }
+                    .tag(4)
+            }
         }
-        .preferredColorScheme(.dark)
-        .accentColor(Color(red: 255/255, green: 165/255, blue: 0/255))
+        .environmentObject(assetManager)
     }
 }
 

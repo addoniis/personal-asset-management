@@ -80,4 +80,16 @@ enum AdditionalInfoValue: Codable {
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type")
         }
     }
+
+    // Display value for UI
+    var displayValue: String {
+        switch self {
+        case .string(let value):
+            return value
+        case .integer(let value):
+            return "\(value)"
+        case .double(let value):
+            return String(format: "%.2f", value)
+        }
+    }
 }
