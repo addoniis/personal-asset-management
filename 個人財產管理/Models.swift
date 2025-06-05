@@ -4,17 +4,21 @@ import Foundation
 enum AssetCategory: String, CaseIterable, Codable {
     case cash = "現金"
     case stock = "股票"
+    case fund = "基金"
     case insurance = "儲蓄險"
     case property = "房產"
     case mortgage = "房貸"
+    case other = "其他"
 
     var icon: String {
         switch self {
         case .cash: return "dollarsign.circle"
         case .stock: return "chart.line.uptrend.xyaxis"
+        case .fund: return "chart.pie"
         case .insurance: return "shield"
         case .property: return "house"
         case .mortgage: return "banknote"
+        case .other: return "ellipsis.circle"
         }
     }
 }
