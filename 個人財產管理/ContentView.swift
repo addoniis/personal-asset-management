@@ -20,7 +20,7 @@ struct ContentView: View {
 
             PropertyView()
                 .tabItem {
-                    Label("不動產", systemImage: "house")
+                    Label("不動產", systemImage: "building.2")
                 }
                 .tag(2)
 

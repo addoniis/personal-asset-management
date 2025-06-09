@@ -37,6 +37,15 @@ class CSVImporter {
                 guard let amount = Double(quantityStr) else { continue }
                 value = amount
 
+                // 從備註中解析幣別信息
+                let currencyCode = note.contains("USD") ? "USD" :
+                                 note.contains("JPY") ? "JPY" :
+                                 note.contains("CNY") ? "CNY" :
+                                 note.contains("EUR") ? "EUR" : "TWD"
+
+                additionalInfo["currency"] = .string(currencyCode)
+                value = amount
+
             case "台灣股票":
                 category = .stock
                 guard let shares = Double(quantityStr) else { continue }

@@ -230,9 +230,19 @@ class AssetManager: ObservableObject {
             var categoryStr: String
             var quantityStr: String
             var nameStr: String
-            let noteStr = asset.note.replacingOccurrences(of: ",", with: "，") // 避免逗號影響CSV格式
 
             switch asset.category {
+            case .cash:
+                categoryStr = asset.category.displayName
+                quantityStr = String(format: "%.0f", asset.value)
+                nameStr = asset.name
+                let currencyCode = asset.additionalInfo["currency"]?.string ?? "TWD"
+                let existingNote = asset.note.isEmpty ? "" : asset.note + " "
+                let noteWithCurrency = currencyCode == "TWD" ? asset.note : existingNote + currencyCode
+
+                csv += "\(categoryStr),\(nameStr),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(noteWithCurrency)\n"
+                continue
+
             case .stock:
                 if let isUSStock = asset.additionalInfo["isUSStock"]?.string,
                    let shares = asset.additionalInfo["shares"]?.string,
@@ -243,13 +253,15 @@ class AssetManager: ObservableObject {
                 } else {
                     continue
                 }
+                csv += "\(categoryStr),\(nameStr),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(asset.note)\n"
+                continue
+
             default:
                 categoryStr = asset.category.displayName
                 quantityStr = String(format: "%.0f", asset.value)
                 nameStr = asset.name
+                csv += "\(categoryStr),\(nameStr),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(asset.note)\n"
             }
-
-            csv += "\(categoryStr),\(nameStr),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(noteStr)\n"
         }
 
         return csv
