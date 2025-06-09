@@ -14,12 +14,7 @@ struct PropertyView: View {
     }
 
     private var totalLoan: Double {
-        propertyAssets.reduce(0) { total, asset in
-            if let loanAmount = asset.additionalInfo["loanAmount"]?.double {
-                return total + loanAmount
-            }
-            return total
-        }
+        assetManager.assets(for: .mortgage).reduce(0) { $0 + $1.value }
     }
 
     private var netValue: Double {
@@ -27,58 +22,64 @@ struct PropertyView: View {
     }
 
     var body: some View {
-        NavigationView {
-            VStack {
-                // 總覽區域
-                VStack(spacing: 16) {
-                    HStack {
-                        Text("不動產總覽")
-                            .font(.headline)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
+        NavigationStack {
+            List {
+                TotalAssetsHeaderView()
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
 
-                    // 上排：總值和貸款
-                    HStack(spacing: 20) {
+                Section(header: Text("不動產資產總覽")) {
+                    // 總覽區域
+                    VStack(spacing: 16) {
+                        HStack {
+                            Text("不動產總覽")
+                                .font(.headline)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+
+                        // 上排：總值和貸款
+                        HStack(spacing: 20) {
+                            VStack {
+                                Text("不動產總值")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text(formatCurrencyAsInteger(totalValue))
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            }
+                            .frame(maxWidth: .infinity)
+
+                            VStack {
+                                Text("貸款總額")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text(formatCurrencyAsInteger(totalLoan))
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.red)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal)
+
+                        // 下排：淨值
                         VStack {
-                            Text("不動產總值")
-                                .font(.subheadline)
+                            Text("淨資產")
+                                .font(.headline)
                                 .foregroundColor(.secondary)
-                            Text(formatCurrencyAsInteger(totalValue))
-                                .font(.title2)
-                                .fontWeight(.medium)
+                            Text(formatCurrencyAsInteger(netValue))
+                                .font(.title)
+                                .fontWeight(.semibold)
                                 .foregroundColor(.blue)
                         }
-                        .frame(maxWidth: .infinity)
-
-                        VStack {
-                            Text("貸款總額")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text(formatCurrencyAsInteger(totalLoan))
-                                .font(.title2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.red)
-                        }
-                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
                     }
-                    .padding(.horizontal)
-
-                    // 下排：淨值
-                    VStack {
-                        Text("淨資產")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text(formatCurrencyAsInteger(netValue))
-                            .font(.title)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.blue)
-                    }
-                    .padding(.top, 8)
+                    .padding(.vertical)
+                    .background(Color(UIColor.systemBackground))
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                 }
-                .padding(.vertical)
-                .background(Color(UIColor.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
 
                 List {
                     ForEach(propertyAssets) { asset in
@@ -116,7 +117,8 @@ struct PropertyView: View {
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "zh_TW")
         formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+        formatter.minimumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 }
 

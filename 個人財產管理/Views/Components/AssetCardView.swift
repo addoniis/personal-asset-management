@@ -13,7 +13,7 @@ struct AssetCardView: View {
                 .foregroundColor(.primary)
 
             HStack(alignment: .bottom) {
-                Text("$\(String(format: "%.2f", amount))")
+                Text(formatCurrencyAsInteger(amount))
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
@@ -31,6 +31,16 @@ struct AssetCardView: View {
         .padding()
         .background(color.opacity(0.1))
         .cornerRadius(12)
+    }
+
+    private func formatCurrencyAsInteger(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "zh_TW")
+        formatter.maximumFractionDigits = 0
+        formatter.minimumFractionDigits = 0
+        formatter.roundingMode = .down
+        return formatter.string(from: NSNumber(value: floor(value)))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 }
 

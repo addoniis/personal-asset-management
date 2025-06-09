@@ -28,8 +28,8 @@ class CSVImporter {
 
             // 根據類別處理數量和價值
             var category: AssetCategory
-            var value: Double
-            var additionalInfo: [String: AdditionalInfoValue] = ["notes": .string(note)]
+            var value: Double = 0
+            var additionalInfo: [String: AdditionalInfoValue] = [:]
 
             switch categoryStr {
             case "現金":
@@ -40,18 +40,18 @@ class CSVImporter {
             case "台灣股票":
                 category = .stock
                 guard let shares = Double(quantityStr) else { continue }
-                value = 0  // 股票價值將由系統根據即時股價計算
                 additionalInfo["isUSStock"] = .string("false")
                 additionalInfo["shares"] = .string(String(format: "%.0f", shares))
                 additionalInfo["symbol"] = .string(name)
+                value = shares  // 暫時將股數設為value，之後會由StockService更新實際價值
 
             case "美國股票":
                 category = .stock
                 guard let shares = Double(quantityStr) else { continue }
-                value = 0  // 股票價值將由系統根據即時股價計算
                 additionalInfo["isUSStock"] = .string("true")
                 additionalInfo["shares"] = .string(String(format: "%.0f", shares))
                 additionalInfo["symbol"] = .string(name)
+                value = shares  // 暫時將股數設為value，之後會由StockService更新實際價值
 
             case "房產":
                 category = .property
@@ -77,6 +77,7 @@ class CSVImporter {
                 category: category,
                 name: name,
                 value: value,
+                note: note,
                 additionalInfo: additionalInfo,
                 createdAt: createdAt,
                 updatedAt: Date()
@@ -91,8 +92,8 @@ class CSVImporter {
         """
         類別,名稱,數量,建立於,備註
         現金,台新銀行,30000,2025/6/5,包含餐費與交通
-        台灣股票,2330.TW,200000,2025/6/5,存股用
-        台灣股票,0056.TW,1000000,2025/6/5,存股用
+        台灣股票,2330.TW,200,2025/6/5,存股用
+        台灣股票,0056.TW,1000,2025/6/5,存股用
         美國股票,AMD,120,2025/6/5,
         美國股票,TSLA,500,2025/6/5,長期持有
         房產,新莊街90號3樓,22000000,2025/6/5,

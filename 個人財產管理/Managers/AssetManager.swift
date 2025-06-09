@@ -209,23 +209,27 @@ class AssetManager: ObservableObject {
         for asset in assets {
             var categoryStr: String
             var quantityStr: String
+            var nameStr: String
+            var noteStr = asset.note.replacingOccurrences(of: ",", with: "，") // 避免逗號影響CSV格式
 
             switch asset.category {
             case .stock:
                 if let isUSStock = asset.additionalInfo["isUSStock"]?.string,
-                   let shares = asset.additionalInfo["shares"]?.string {
+                   let shares = asset.additionalInfo["shares"]?.string,
+                   let symbol = asset.additionalInfo["symbol"]?.string {
                     categoryStr = isUSStock == "true" ? "美國股票" : "台灣股票"
                     quantityStr = shares
+                    nameStr = symbol
                 } else {
                     continue
                 }
             default:
                 categoryStr = asset.category.displayName
                 quantityStr = String(format: "%.0f", asset.value)
+                nameStr = asset.name
             }
 
-            let note = asset.additionalInfo["notes"]?.string ?? ""
-            csv += "\(categoryStr),\(asset.name),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(note)\n"
+            csv += "\(categoryStr),\(nameStr),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(noteStr)\n"
         }
 
         return csv

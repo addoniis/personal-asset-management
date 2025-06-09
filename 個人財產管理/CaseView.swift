@@ -68,7 +68,10 @@ struct CaseView: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "zh_TW")
-        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+        formatter.maximumFractionDigits = 0
+        formatter.minimumFractionDigits = 0
+        formatter.roundingMode = .down
+        return formatter.string(from: NSNumber(value: floor(value)))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 }
 
@@ -105,7 +108,10 @@ struct AssetRowView: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "zh_TW")
-        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+        formatter.maximumFractionDigits = 0
+        formatter.minimumFractionDigits = 0
+        formatter.roundingMode = .down
+        return formatter.string(from: NSNumber(value: floor(value)))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 }
 

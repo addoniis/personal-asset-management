@@ -7,7 +7,7 @@ enum AssetEditMode {
 
 struct AssetEditView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var assetManager = AssetManager.shared
+    @EnvironmentObject var assetManager: AssetManager
     @State private var assetName: String
     @State private var amount: String
     @State private var category: AssetCategory
@@ -16,29 +16,27 @@ struct AssetEditView: View {
     @State private var showingDeleteAlert = false
 
     let mode: AssetEditMode
-    let initialAsset: Asset
+    let initialAsset: Asset?
 
-    init(mode: AssetEditMode, initialAsset: Asset) {
+    init(mode: AssetEditMode, initialAsset: Asset?) {
         self.mode = mode
         self.initialAsset = initialAsset
-        _assetName = State(initialValue: initialAsset.name)
-        _amount = State(initialValue: String(format: "%.2f", initialAsset.value))
-        _category = State(initialValue: initialAsset.category)
-        _date = State(initialValue: initialAsset.createdAt)
-        _notes = State(initialValue: initialAsset.additionalInfo["notes"]?.string ?? "")
+        _assetName = State(initialValue: initialAsset?.name ?? "")
+        _amount = State(initialValue: initialAsset?.value != nil ? String(format: "%.0f", initialAsset!.value) : "")
+        _category = State(initialValue: initialAsset?.category ?? .cash)
+        _date = State(initialValue: initialAsset?.createdAt ?? Date())
+        _notes = State(initialValue: initialAsset?.note ?? "")
     }
 
     var body: some View {
         Form {
-            Section(header: Text("基本信息")) {
+            Section(header: Text("基本資訊")) {
                 TextField("名稱", text: $assetName)
                 TextField("金額", text: $amount)
-                    .keyboardType(.decimalPad)
-                if mode == .add {
-                    Picker("類別", selection: $category) {
-                        ForEach(AssetCategory.allCases) { category in
-                            Text(category.displayName).tag(category)
-                        }
+                    .keyboardType(category == .cash ? .numberPad : .decimalPad)
+                Picker("類別", selection: $category) {
+                    ForEach(AssetCategory.allCases) { category in
+                        Text(category.displayName).tag(category)
                     }
                 }
                 DatePicker("日期", selection: $date, displayedComponents: .date)
@@ -51,14 +49,8 @@ struct AssetEditView: View {
 
             if mode == .edit {
                 Section {
-                    Button(role: .destructive) {
+                    Button("刪除資產", role: .destructive) {
                         showingDeleteAlert = true
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text("刪除資產")
-                            Spacer()
-                        }
                     }
                 }
             }
@@ -90,27 +82,35 @@ struct AssetEditView: View {
     private func saveAsset() {
         guard let amountValue = Double(amount) else { return }
 
-        let updatedAsset = Asset(
-            id: mode == .add ? UUID() : initialAsset.id,
+        let finalValue: Double
+        if category == .cash {
+            finalValue = floor(amountValue)
+        } else {
+            finalValue = amountValue
+        }
+
+        let asset = Asset(
+            id: initialAsset?.id ?? UUID(),
             category: category,
             name: assetName,
-            value: amountValue,
-            additionalInfo: ["notes": .string(notes)],
-            createdAt: mode == .add ? date : initialAsset.createdAt,
-            updatedAt: Date()
+            value: finalValue,
+            note: notes,
+            createdAt: initialAsset?.createdAt ?? date
         )
 
         if mode == .add {
-            assetManager.addAsset(updatedAsset)
+            assetManager.addAsset(asset)
         } else {
-            assetManager.updateAsset(updatedAsset)
+            assetManager.updateAsset(asset)
         }
 
         dismiss()
     }
 
     private func deleteAsset() {
-        assetManager.deleteAsset(initialAsset)
+        if let asset = initialAsset {
+            assetManager.deleteAsset(asset)
+        }
         dismiss()
     }
 }
@@ -124,7 +124,8 @@ struct AssetEditView: View {
                 category: .property,
                 name: "測試資產",
                 value: 1000000,
-                additionalInfo: ["notes": .string("測試備註")],
+                note: "測試備註",
+                additionalInfo: [:],
                 createdAt: Date(),
                 updatedAt: Date()
             )

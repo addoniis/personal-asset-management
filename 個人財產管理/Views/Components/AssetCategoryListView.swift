@@ -18,7 +18,7 @@ struct AssetCategoryListView: View {
                     Spacer()
 
                     VStack(alignment: .trailing) {
-                        Text("$\(String(format: "%.2f", category.1))")
+                        Text("NT$\(String(format: "%.0f", category.1))")
                             .fontWeight(.medium)
 
                         Text("\(String(format: "%.1f", (category.1/total)*100))%")

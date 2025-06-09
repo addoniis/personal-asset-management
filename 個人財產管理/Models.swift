@@ -7,6 +7,7 @@ struct Asset: Codable, Identifiable {
     var category: AssetCategory
     var name: String
     var value: Double
+    var note: String = ""
     var additionalInfo: [String: AdditionalInfoValue] = [:]
     var createdAt: Date = Date()
     var updatedAt: Date = Date()

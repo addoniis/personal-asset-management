@@ -55,87 +55,97 @@ struct StockView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
-                // 總覽區域
-                VStack(spacing: 16) {
-                    HStack {
-                        Text("股票資產總覽")
-                            .font(.headline)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
+            ScrollView {
+                VStack(spacing: 0) {
+                    TotalAssetsHeaderView()
+                        .padding(.bottom, 8)
 
-                    // 上排：台股和美股
-                    HStack(spacing: 20) {
+                    // 總覽區域
+                    VStack(spacing: 16) {
+                        HStack {
+                            Text("股票資產總覽")
+                                .font(.headline)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+
+                        // 上排：台股和美股
+                        HStack(spacing: 20) {
+                            VStack {
+                                Text("台股總值")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text(formatCurrencyAsInteger(twStockValue))
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            }
+                            .frame(maxWidth: .infinity)
+
+                            VStack {
+                                Text("美股總值")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text(formatCurrencyAsInteger(usStockValue * stockService.usdExchangeRate))
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal)
+
+                        // 下排：股票總值
                         VStack {
-                            Text("台股總值")
-                                .font(.subheadline)
+                            Text("股票總值")
+                                .font(.headline)
                                 .foregroundColor(.secondary)
-                            Text(formatCurrencyAsInteger(twStockValue))
-                                .font(.title2)
-                                .fontWeight(.medium)
+                            Text(formatCurrencyAsInteger(totalStockValue))
+                                .font(.title)
+                                .fontWeight(.semibold)
                                 .foregroundColor(.blue)
                         }
-                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
 
-                        VStack {
-                            Text("美股總值")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text(formatCurrencyAsInteger(usStockValue * stockService.usdExchangeRate))
-                                .font(.title2)
-                                .fontWeight(.medium)
+                        // 顯示美元匯率
+                        HStack {
+                            Text("目前美元匯率：")
+                            Text(String(format: "%.2f", stockService.usdExchangeRate))
                                 .foregroundColor(.blue)
+                            Text("TWD/USD")
                         }
-                        .frame(maxWidth: .infinity)
+                        .font(.subheadline)
+                        .padding(.top, 4)
                     }
-                    .padding(.horizontal)
+                    .padding(.vertical)
+                    .background(Color(UIColor.systemBackground))
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
 
-                    // 下排：股票總值
-                    VStack {
-                        Text("股票總值")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text(formatCurrencyAsInteger(totalStockValue))
-                            .font(.title)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.blue)
+                    // 股票類型選擇器
+                    Picker("股票類型", selection: $stockType) {
+                        ForEach(StockType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
                     }
-                    .padding(.top, 8)
+                    .pickerStyle(.segmented)
+                    .padding()
 
-                    // 顯示美元匯率
-                    HStack {
-                        Text("目前美元匯率：")
-                        Text(String(format: "%.2f", stockService.usdExchangeRate))
-                            .foregroundColor(.blue)
-                        Text("TWD/USD")
-                    }
-                    .font(.subheadline)
-                    .padding(.top, 4)
-                }
-                .padding(.vertical)
-                .background(Color(UIColor.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-
-                // 股票類型選擇器
-                Picker("股票類型", selection: $stockType) {
-                    ForEach(StockType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding()
-
-                List {
-                    Section(header: Text("股票明細")) {
+                    // 股票列表
+                    LazyVStack(spacing: 0) {
                         ForEach(filterStocks()) { asset in
                             StockRowView(asset: asset, stockService: stockService, stockValues: $stockValues)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     selectedAsset = asset
                                 }
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+
+                            Divider()
+                                .padding(.horizontal)
                         }
                     }
+                    .background(Color(UIColor.systemBackground))
                 }
             }
             .navigationTitle("股票")
@@ -252,7 +262,7 @@ struct StockRowView: View {
                 if Task.isCancelled { return }
 
                 let stockSymbol = asset.additionalInfo["symbol"]?.string ?? asset.name
-                                currentPrice = try await isUSStock ?
+                currentPrice = try await isUSStock ?
                     stockService.fetchUSStockPrice(symbol: stockSymbol) :
                     stockService.fetchTWStockPrice(symbol: stockSymbol)
 
@@ -279,7 +289,7 @@ struct StockRowView: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(asset.name)
+                Text(asset.additionalInfo["symbol"]?.string ?? asset.name)
                     .font(.headline)
                 Text("股數：\(shares)")
                     .font(.subheadline)
@@ -342,6 +352,23 @@ struct StockEditView: View {
         fetchTask = nil
     }
 
+    private func formatCurrency(_ value: Double, includeDecimals: Bool = false) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "zh_TW")
+        formatter.minimumFractionDigits = includeDecimals ? 2 : 0
+        formatter.maximumFractionDigits = includeDecimals ? 2 : 0
+        return formatter.string(from: NSNumber(value: value)) ?? "NT$0"
+    }
+
+    private func formatPrice(_ price: Double) -> String {
+        if stockType == .us {
+            return "$\(String(format: "%.2f", price))"
+        } else {
+            return "NT$\(String(format: "%.2f", price))"
+        }
+    }
+
     private func fetchStockPrice() {
         guard !symbol.isEmpty else { return }
 
@@ -396,7 +423,7 @@ struct StockEditView: View {
                     HStack {
                         Text("現價")
                         Spacer()
-                        Text(formatCurrency(price))
+                        Text(formatPrice(price))
                             .foregroundColor(.blue)
                     }
 
@@ -404,7 +431,7 @@ struct StockEditView: View {
                         HStack {
                             Text("台幣價格")
                             Spacer()
-                            Text(formatCurrency(price * stockService.usdExchangeRate))
+                            Text(formatCurrency(price * stockService.usdExchangeRate, includeDecimals: true))
                                 .foregroundColor(.blue)
                         }
                     }
@@ -471,7 +498,7 @@ struct StockEditView: View {
         }
         .onAppear {
             if let asset = initialAsset {
-                symbol = asset.name
+                symbol = asset.additionalInfo["symbol"]?.string ?? asset.name
                 shares = asset.additionalInfo["shares"]?.string ?? ""
                 fetchStockPrice()
             }
@@ -516,14 +543,6 @@ struct StockEditView: View {
             assetManager.deleteAsset(asset)
         }
         dismiss()
-    }
-
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale(identifier: "zh_TW")
-        formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "$0"
     }
 }
 

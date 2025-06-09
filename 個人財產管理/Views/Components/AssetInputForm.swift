@@ -9,12 +9,21 @@ struct AssetInputForm: View {
 
     let onSubmit: () -> Void
 
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "zh_TW")
+        formatter.maximumFractionDigits = category == .stock ? 2 : 0
+        formatter.minimumFractionDigits = category == .stock ? 2 : 0
+        return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
+    }
+
     var body: some View {
         Form {
             Section(header: Text("基本信息")) {
                 TextField("資產名稱", text: $assetName)
                 TextField("金額", text: $amount)
-                    .keyboardType(.decimalPad)
+                    .keyboardType(category == .cash ? .numberPad : .decimalPad)
                 Picker("類別", selection: $category) {
                     ForEach(AssetCategory.allCases) { category in
                         Text(category.rawValue).tag(category)
