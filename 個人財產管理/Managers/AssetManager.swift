@@ -185,6 +185,51 @@ class AssetManager: ObservableObject {
         }
         return growthHistory
     }
+
+    func importAssetsFromCSV(_ csvString: String) {
+        // 清除現有資產
+        assets.removeAll()
+
+        // 導入新資產
+        let importedAssets = CSVImporter.importAssets(from: csvString)
+        assets.append(contentsOf: importedAssets)
+
+        // 保存並通知更新
+        saveAssets()
+        updateHistory()
+        objectWillChange.send()
+    }
+
+    func exportAssetsToCSV() -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy/MM/dd"
+
+        var csv = "類別,名稱,數量,建立於,備註\n"
+
+        for asset in assets {
+            var categoryStr: String
+            var quantityStr: String
+
+            switch asset.category {
+            case .stock:
+                if let isUSStock = asset.additionalInfo["isUSStock"]?.string,
+                   let shares = asset.additionalInfo["shares"]?.string {
+                    categoryStr = isUSStock == "true" ? "美國股票" : "台灣股票"
+                    quantityStr = shares
+                } else {
+                    continue
+                }
+            default:
+                categoryStr = asset.category.displayName
+                quantityStr = String(format: "%.0f", asset.value)
+            }
+
+            let note = asset.additionalInfo["notes"]?.string ?? ""
+            csv += "\(categoryStr),\(asset.name),\(quantityStr),\(dateFormatter.string(from: asset.createdAt)),\(note)\n"
+        }
+
+        return csv
+    }
 }
 
 // MARK: - Convenience Methods
@@ -207,5 +252,16 @@ extension AssetManager {
             totals[category] = totalValue(for: category)
         }
         return totals
+    }
+
+    // MARK: - Reset Data
+    func resetAllData() {
+        // 清除所有資料
+        storageManager.clearAllData()
+        // 重置內存中的資料
+        assets = []
+        assetHistory = []
+        // 發送通知資料已更新
+        objectWillChange.send()
     }
 }

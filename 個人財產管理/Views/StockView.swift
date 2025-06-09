@@ -6,6 +6,7 @@ struct StockView: View {
     @State private var showingAddSheet = false
     @State private var selectedAsset: Asset? = nil
     @State private var stockType: StockType = .taiwan
+    @State private var stockValues: [String: Double] = [:]
 
     enum StockType: String, CaseIterable {
         case taiwan = "台股"
@@ -19,13 +20,21 @@ struct StockView: View {
     private var twStockValue: Double {
         stockAssets
             .filter { $0.additionalInfo["isUSStock"]?.string != "true" }
-            .reduce(0) { $0 + $1.value }
+            .reduce(0) { total, asset in
+                total + (stockValues[asset.id.uuidString] ?? asset.value)
+            }
     }
 
     private var usStockValue: Double {
         stockAssets
             .filter { $0.additionalInfo["isUSStock"]?.string == "true" }
-            .reduce(0) { $0 + $1.value }
+            .reduce(0) { total, asset in
+                total + (stockValues[asset.id.uuidString] ?? asset.value)
+            }
+    }
+
+    private var totalStockValue: Double {
+        twStockValue + (usStockValue * stockService.usdExchangeRate)
     }
 
     private func formatCurrencyAsInteger(_ value: Double) -> String {
@@ -36,8 +45,16 @@ struct StockView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "$0"
     }
 
+    private func updateStockValue(for asset: Asset, price: Double) {
+        if let shares = asset.additionalInfo["shares"]?.string,
+           let sharesNum = Double(shares) {
+            let value = price * sharesNum
+            stockValues[asset.id.uuidString] = value
+        }
+    }
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 // 總覽區域
                 VStack(spacing: 16) {
@@ -65,7 +82,7 @@ struct StockView: View {
                             Text("美股總值")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                            Text(formatCurrencyAsInteger(usStockValue))
+                            Text(formatCurrencyAsInteger(usStockValue * stockService.usdExchangeRate))
                                 .font(.title2)
                                 .fontWeight(.medium)
                                 .foregroundColor(.blue)
@@ -79,12 +96,22 @@ struct StockView: View {
                         Text("股票總值")
                             .font(.headline)
                             .foregroundColor(.secondary)
-                        Text(formatCurrencyAsInteger(twStockValue + usStockValue))
+                        Text(formatCurrencyAsInteger(totalStockValue))
                             .font(.title)
                             .fontWeight(.semibold)
                             .foregroundColor(.blue)
                     }
                     .padding(.top, 8)
+
+                    // 顯示美元匯率
+                    HStack {
+                        Text("目前美元匯率：")
+                        Text(String(format: "%.2f", stockService.usdExchangeRate))
+                            .foregroundColor(.blue)
+                        Text("TWD/USD")
+                    }
+                    .font(.subheadline)
+                    .padding(.top, 4)
                 }
                 .padding(.vertical)
                 .background(Color(UIColor.systemBackground))
@@ -99,30 +126,10 @@ struct StockView: View {
                 .pickerStyle(.segmented)
                 .padding()
 
-                if stockType == .us {
-                    // 顯示美元匯率
-                    HStack {
-                        Text("目前美元匯率：")
-                        Text(String(format: "%.2f", stockService.usdExchangeRate))
-                            .foregroundColor(.blue)
-                        Text("TWD/USD")
-                    }
-                    .padding(.horizontal)
-                }
-
                 List {
-                    Section(header: Text("當前類別總覽")) {
-                        HStack {
-                            Text("總市值")
-                            Spacer()
-                            Text(formatCurrencyAsInteger(calculateTotalValue()))
-                                .foregroundColor(.blue)
-                        }
-                    }
-
                     Section(header: Text("股票明細")) {
                         ForEach(filterStocks()) { asset in
-                            StockRowView(asset: asset, stockService: stockService)
+                            StockRowView(asset: asset, stockService: stockService, stockValues: $stockValues)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     selectedAsset = asset
@@ -140,7 +147,7 @@ struct StockView: View {
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                NavigationView {
+                NavigationStack {
                     StockEditView(
                         mode: .add,
                         stockType: stockType,
@@ -149,12 +156,19 @@ struct StockView: View {
                 }
             }
             .sheet(item: $selectedAsset) { asset in
-                NavigationView {
+                NavigationStack {
                     StockEditView(
                         mode: .edit,
                         stockType: getStockType(from: asset),
                         initialAsset: asset
                     )
+                }
+            }
+            .onAppear {
+                // 更新所有股票價格
+                for asset in stockAssets {
+                    let rowView = StockRowView(asset: asset, stockService: stockService, stockValues: $stockValues)
+                    rowView.fetchStockPrice()
                 }
             }
         }
@@ -168,10 +182,11 @@ struct StockView: View {
     }
 
     private func calculateTotalValue() -> Double {
-        filterStocks().reduce(0) { total, asset in
+        let currentTypeStocks = filterStocks()
+        return currentTypeStocks.reduce(0) { total, asset in
             let isUSStock = asset.additionalInfo["isUSStock"]?.string == "true"
             if isUSStock {
-                return total + (asset.value * stockService.usdExchangeRate)
+                return total + asset.value
             } else {
                 return total + asset.value
             }
@@ -186,82 +201,30 @@ struct StockView: View {
 struct StockRowView: View {
     let asset: Asset
     let stockService: StockService
+    @Binding var stockValues: [String: Double]
     @State private var currentPrice: Double?
     @State private var isLoading = false
     @State private var error: String?
+    @State private var fetchTask: Task<Void, Never>?
 
     private var isUSStock: Bool {
         asset.additionalInfo["isUSStock"]?.string == "true"
     }
 
     private var shares: Int {
-        if let sharesString = asset.additionalInfo["shares"]?.string,
-           let shares = Int(sharesString) {
+        if let sharesStr = asset.additionalInfo["shares"]?.string,
+           let shares = Int(sharesStr) {
             return shares
         }
         return 0
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(asset.name)
-                    .font(.headline)
-                Spacer()
-                if isLoading {
-                    ProgressView()
-                } else if let price = currentPrice {
-                    VStack(alignment: .trailing) {
-                        Text(formatCurrency(price))
-                            .foregroundColor(.blue)
-                        if isUSStock {
-                            Text(formatCurrency(price * stockService.usdExchangeRate))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-            }
-
-            HStack {
-                Text("股數：\(shares)")
-                Spacer()
-                if let price = currentPrice {
-                    let value = Double(shares) * price * (isUSStock ? stockService.usdExchangeRate : 1)
-                    Text("市值：\(formatCurrency(value))")
-                }
-            }
-            .font(.subheadline)
-            .foregroundColor(.secondary)
-
-            if let error = error {
-                Text(error)
-                    .font(.caption)
-                    .foregroundColor(.red)
-            }
-        }
-        .padding(.vertical, 4)
-        .onAppear {
-            fetchStockPrice()
-        }
-    }
-
-    private func fetchStockPrice() {
-        guard let symbol = asset.additionalInfo["symbol"]?.string else { return }
-        isLoading = true
-        error = nil
-
-        Task {
-            do {
-                if isUSStock {
-                    currentPrice = try await stockService.fetchUSStockPrice(symbol: symbol)
-                } else {
-                    currentPrice = try await stockService.fetchTWStockPrice(symbol: symbol)
-                }
-            } catch {
-                self.error = error.localizedDescription
-            }
-            isLoading = false
+    private var totalValue: Double {
+        guard let price = currentPrice else { return 0 }
+        if isUSStock {
+            return Double(shares) * price * stockService.usdExchangeRate
+        } else {
+            return Double(shares) * price
         }
     }
 
@@ -270,7 +233,90 @@ struct StockRowView: View {
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "zh_TW")
         formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+        return formatter.string(from: NSNumber(value: value)) ?? "NT$0"
+    }
+
+    private func cancelFetchTask() {
+        fetchTask?.cancel()
+        fetchTask = nil
+    }
+
+    func fetchStockPrice() {
+        cancelFetchTask()
+
+        isLoading = true
+        error = nil
+
+        fetchTask = Task {
+            do {
+                if Task.isCancelled { return }
+
+                let stockSymbol = asset.additionalInfo["symbol"]?.string ?? asset.name
+                                currentPrice = try await isUSStock ?
+                    stockService.fetchUSStockPrice(symbol: stockSymbol) :
+                    stockService.fetchTWStockPrice(symbol: stockSymbol)
+
+                if let price = currentPrice {
+                    let value = Double(shares) * price
+                    stockValues[asset.id.uuidString] = value
+                }
+            } catch is CancellationError {
+                // Ignore cancellation errors
+                return
+            } catch {
+                if !Task.isCancelled {
+                    self.error = "無法獲取價格"
+                    print("Error fetching stock price: \(error)")
+                }
+            }
+
+            if !Task.isCancelled {
+                isLoading = false
+            }
+        }
+    }
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(asset.name)
+                    .font(.headline)
+                Text("股數：\(shares)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                if isLoading {
+                    ProgressView()
+                } else if let error = error {
+                    Text(error)
+                        .foregroundColor(.red)
+                } else if let price = currentPrice {
+                    if isUSStock {
+                        Text("$\(String(format: "%.2f", price))")
+                            .font(.headline)
+                        Text(formatCurrency(totalValue))
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    } else {
+                        Text("NT$\(String(format: "%.2f", price))")
+                            .font(.headline)
+                        Text(formatCurrency(totalValue))
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            fetchStockPrice()
+        }
+        .onDisappear {
+            cancelFetchTask()
+        }
     }
 }
 
@@ -289,6 +335,48 @@ struct StockEditView: View {
     @State private var error: String?
     @State private var currentPrice: Double?
     @State private var showingDeleteAlert = false
+    @State private var fetchTask: Task<Void, Never>?
+
+    private func cancelFetchTask() {
+        fetchTask?.cancel()
+        fetchTask = nil
+    }
+
+    private func fetchStockPrice() {
+        guard !symbol.isEmpty else { return }
+
+        // Cancel any existing fetch task
+        cancelFetchTask()
+
+        isLoading = true
+        error = nil
+        currentPrice = nil
+
+        fetchTask = Task {
+            do {
+                if Task.isCancelled { return }
+
+                if stockType == .us {
+                    currentPrice = try await stockService.fetchUSStockPrice(symbol: symbol)
+                } else {
+                    let symbolWithTW = symbol.hasSuffix(".TW") ? symbol : "\(symbol).TW"
+                    currentPrice = try await stockService.fetchTWStockPrice(symbol: symbolWithTW)
+                }
+            } catch is CancellationError {
+                // Ignore cancellation errors
+                return
+            } catch {
+                if !Task.isCancelled {
+                    print("Error fetching stock price: \(error)")
+                    self.error = "無法獲取價格：\(error.localizedDescription)"
+                }
+            }
+
+            if !Task.isCancelled {
+                isLoading = false
+            }
+        }
+    }
 
     var body: some View {
         Form {
@@ -376,35 +464,20 @@ struct StockEditView: View {
         } message: {
             Text("確定要刪除這個股票嗎？此操作無法撤銷。")
         }
-        .onChange(of: symbol) { _ in
-            fetchStockPrice()
+        .onChange(of: symbol) { oldValue, newValue in
+            if oldValue != newValue {
+                fetchStockPrice()
+            }
         }
         .onAppear {
             if let asset = initialAsset {
-                symbol = asset.additionalInfo["symbol"]?.string ?? ""
+                symbol = asset.name
                 shares = asset.additionalInfo["shares"]?.string ?? ""
                 fetchStockPrice()
             }
         }
-    }
-
-    private func fetchStockPrice() {
-        guard !symbol.isEmpty else { return }
-        isLoading = true
-        error = nil
-        currentPrice = nil
-
-        Task {
-            do {
-                if stockType == .us {
-                    currentPrice = try await stockService.fetchUSStockPrice(symbol: symbol)
-                } else {
-                    currentPrice = try await stockService.fetchTWStockPrice(symbol: symbol)
-                }
-            } catch {
-                self.error = error.localizedDescription
-            }
-            isLoading = false
+        .onDisappear {
+            cancelFetchTask()
         }
     }
 
@@ -422,7 +495,7 @@ struct StockEditView: View {
         let asset = Asset(
             id: initialAsset?.id ?? UUID(),
             category: .stock,
-            name: "\(symbol) (\(shares)股)",
+            name: symbol,
             value: value,
             additionalInfo: additionalInfo,
             createdAt: initialAsset?.createdAt ?? Date(),

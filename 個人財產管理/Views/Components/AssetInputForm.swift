@@ -42,19 +42,25 @@ struct AssetInputForm: View {
     }
 }
 
-#Preview {
-    @State var assetName = ""
-    @State var amount = ""
-    @State var category = AssetCategory.cash
-    @State var date = Date()
-    @State var notes = ""
+struct AssetInputFormPreview: View {
+    @State private var assetName = ""
+    @State private var amount = ""
+    @State private var category = AssetCategory.cash
+    @State private var date = Date()
+    @State private var notes = ""
 
-    return AssetInputForm(
-        assetName: $assetName,
-        amount: $amount,
-        category: $category,
-        date: $date,
-        notes: $notes,
-        onSubmit: {}
-    )
+    var body: some View {
+        AssetInputForm(
+            assetName: $assetName,
+            amount: $amount,
+            category: $category,
+            date: $date,
+            notes: $notes,
+            onSubmit: {}
+        )
+    }
+}
+
+#Preview {
+    AssetInputFormPreview()
 }
