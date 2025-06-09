@@ -43,7 +43,7 @@ struct AssetEditView: View {
                 }
                 if category == .cash {
                     Picker("幣別", selection: $currency) {
-                        ForEach(Currency.allCases, id: \.self) { currency in
+                        ForEach(Currency.allCases) { currency in
                             Text(currency.displayName).tag(currency)
                         }
                     }
@@ -89,23 +89,17 @@ struct AssetEditView: View {
     }
 
     private func saveAsset() {
-        guard let amountValue = Double(amount) else { return }
-
-        let finalValue: Double
-        if category == .cash {
-            finalValue = floor(amountValue)
-        } else {
-            finalValue = amountValue
-        }
+        guard let value = Double(amount) else { return }
 
         let asset = Asset(
             id: initialAsset?.id ?? UUID(),
             category: category,
             name: assetName,
-            value: finalValue,
+            value: value,
             currency: currency,
             note: notes,
-            createdAt: initialAsset?.createdAt ?? date
+            createdAt: date,
+            updatedAt: Date()
         )
 
         if mode == .add {
@@ -127,18 +121,7 @@ struct AssetEditView: View {
 
 #Preview {
     NavigationView {
-        AssetEditView(
-            mode: .add,
-            initialAsset: Asset(
-                id: UUID(),
-                category: .property,
-                name: "測試資產",
-                value: 1000000,
-                note: "測試備註",
-                additionalInfo: [:],
-                createdAt: Date(),
-                updatedAt: Date()
-            )
-        )
+        AssetEditView(mode: .add, initialAsset: nil)
+            .environmentObject(AssetManager.shared)
     }
 }

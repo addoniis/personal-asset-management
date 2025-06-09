@@ -1,11 +1,13 @@
 import Foundation
 
-enum Currency: String, CaseIterable, Codable {
+enum Currency: String, CaseIterable, Codable, Identifiable {
     case twd = "TWD"
     case usd = "USD"
     case jpy = "JPY"
     case cny = "CNY"
     case eur = "EUR"
+
+    var id: String { self.rawValue }
 
     var displayName: String {
         switch self {

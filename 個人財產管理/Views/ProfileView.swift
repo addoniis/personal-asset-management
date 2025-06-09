@@ -21,13 +21,25 @@ struct ProfileView: View {
                                 .imageScale(.large)
                             VStack(alignment: .leading) {
                                 Text("資產分析")
-                                    .font(.headline)
-                                Text("查看資產配置與分析")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                Text("查看資產配置與趨勢")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
-                        .padding(.vertical, 8)
+                    }
+
+                    NavigationLink(destination: SettingView()) {
+                        HStack {
+                            Image(systemName: "gearshape.fill")
+                                .foregroundColor(.orange)
+                                .imageScale(.large)
+                            VStack(alignment: .leading) {
+                                Text("設定")
+                                Text("設定資產分類、匯率與提醒")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                 }
 
@@ -46,16 +58,6 @@ struct ProfileView: View {
                         }
                     }
                     .padding(.vertical, 8)
-                }
-
-                Section(header: Text("資產設定")) {
-                    NavigationLink(destination: Text("資產分類管理")) {
-                        Label("資產分類管理", systemImage: "folder")
-                    }
-
-                    NavigationLink(destination: Text("匯率設定")) {
-                        Label("匯率設定", systemImage: "dollarsign.circle")
-                    }
                 }
 
                 Section(header: Text("應用設定")) {

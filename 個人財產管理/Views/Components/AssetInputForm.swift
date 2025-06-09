@@ -26,7 +26,7 @@ struct AssetInputForm: View {
                     .keyboardType(category == .cash ? .numberPad : .decimalPad)
                 Picker("類別", selection: $category) {
                     ForEach(AssetCategory.allCases) { category in
-                        Text(category.rawValue).tag(category)
+                        Text(category.displayName).tag(category)
                     }
                 }
                 DatePicker("日期", selection: $date, displayedComponents: .date)
