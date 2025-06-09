@@ -1,33 +1,26 @@
 import SwiftUI
 
-enum AssetEditMode {
-    case add
-    case edit
-}
-
-struct AssetEditView: View {
+struct CashEditView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var assetManager: AssetManager
-    @State private var assetName: String
-    @State private var amount: String
-    @State private var category: AssetCategory
-    @State private var currency: Currency
-    @State private var date: Date
-    @State private var notes: String
-    @State private var showingDeleteAlert = false
 
     let mode: AssetEditMode
     let initialAsset: Asset?
 
+    @State private var assetName: String = ""
+    @State private var amount: String = ""
+    @State private var currency: Currency = .twd
+    @State private var note: String = ""
+    @State private var showingDeleteAlert = false
+
     init(mode: AssetEditMode, initialAsset: Asset?) {
         self.mode = mode
         self.initialAsset = initialAsset
+
         _assetName = State(initialValue: initialAsset?.name ?? "")
         _amount = State(initialValue: initialAsset?.value != nil ? String(format: "%.0f", initialAsset!.value) : "")
-        _category = State(initialValue: initialAsset?.category ?? .cash)
-        _currency = State(initialValue: initialAsset?.currency ?? .twd)
-        _date = State(initialValue: initialAsset?.createdAt ?? Date())
-        _notes = State(initialValue: initialAsset?.note ?? "")
+        _currency = State(initialValue: Currency(rawValue: initialAsset?.additionalInfo["currency"]?.string ?? "TWD") ?? .twd)
+        _note = State(initialValue: initialAsset?.additionalInfo["note"]?.string ?? "")
     }
 
     var body: some View {
@@ -35,24 +28,16 @@ struct AssetEditView: View {
             Section(header: Text("基本資訊")) {
                 TextField("名稱", text: $assetName)
                 TextField("金額", text: $amount)
-                    .keyboardType(category == .cash ? .numberPad : .decimalPad)
-                Picker("類別", selection: $category) {
-                    ForEach(AssetCategory.allCases) { category in
-                        Text(category.displayName).tag(category)
+                    .keyboardType(.numberPad)
+                Picker("幣別", selection: $currency) {
+                    ForEach(Currency.allCases, id: \.self) { currency in
+                        Text(currency.displayName).tag(currency)
                     }
                 }
-                if category == .cash {
-                    Picker("幣別", selection: $currency) {
-                        ForEach(Currency.allCases, id: \.self) { currency in
-                            Text(currency.displayName).tag(currency)
-                        }
-                    }
-                }
-                DatePicker("日期", selection: $date, displayedComponents: .date)
             }
 
             Section(header: Text("備註")) {
-                TextEditor(text: $notes)
+                TextEditor(text: $note)
                     .frame(height: 100)
             }
 
@@ -64,7 +49,7 @@ struct AssetEditView: View {
                 }
             }
         }
-        .navigationTitle(mode == .add ? "新增資產" : "編輯資產")
+        .navigationTitle(mode == .add ? "新增現金" : "編輯現金")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -91,21 +76,20 @@ struct AssetEditView: View {
     private func saveAsset() {
         guard let amountValue = Double(amount) else { return }
 
-        let finalValue: Double
-        if category == .cash {
-            finalValue = floor(amountValue)
-        } else {
-            finalValue = amountValue
+        var additionalInfo: [String: AdditionalInfoValue] = [:]
+        additionalInfo["currency"] = .string(currency.rawValue)
+        if !note.isEmpty {
+            additionalInfo["note"] = .string(note)
         }
 
         let asset = Asset(
             id: initialAsset?.id ?? UUID(),
-            category: category,
+            category: .cash,
             name: assetName,
-            value: finalValue,
-            currency: currency,
-            note: notes,
-            createdAt: initialAsset?.createdAt ?? date
+            value: floor(amountValue),
+            additionalInfo: additionalInfo,
+            createdAt: initialAsset?.createdAt ?? Date(),
+            updatedAt: Date()
         )
 
         if mode == .add {
@@ -127,18 +111,19 @@ struct AssetEditView: View {
 
 #Preview {
     NavigationView {
-        AssetEditView(
+        CashEditView(
             mode: .add,
             initialAsset: Asset(
                 id: UUID(),
-                category: .property,
-                name: "測試資產",
-                value: 1000000,
-                note: "測試備註",
-                additionalInfo: [:],
-                createdAt: Date(),
-                updatedAt: Date()
+                category: .cash,
+                name: "測試現金",
+                value: 10000,
+                additionalInfo: [
+                    "currency": .string("TWD"),
+                    "note": .string("測試備註")
+                ]
             )
         )
+        .environmentObject(AssetManager.shared)
     }
 }

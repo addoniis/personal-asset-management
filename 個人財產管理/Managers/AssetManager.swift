@@ -31,6 +31,22 @@ class AssetManager: ObservableObject {
         assets.reduce(0) { $0 + $1.value }
     }
 
+    var totalCash: Double {
+        assets.filter { $0.category == .cash }.reduce(0) { $0 + $1.value }
+    }
+
+    var totalStocks: Double {
+        assets.filter { $0.category == .stock }.reduce(0) { $0 + $1.value }
+    }
+
+    var totalProperties: Double {
+        assets.filter { $0.category == .property }.reduce(0) { $0 + $1.value }
+    }
+
+    var totalInsurance: Double {
+        assets.filter { $0.category == .insurance }.reduce(0) { $0 + $1.value }
+    }
+
     var assetsByCategory: [AssetCategory: Double] {
         Dictionary(grouping: assets, by: { $0.category })
             .mapValues { assets in
@@ -48,7 +64,9 @@ class AssetManager: ObservableObject {
     }
 
     init() {
-        loadAssets()
+        Task {
+            await loadAssets()
+        }
         loadHistory()
     }
 
@@ -74,7 +92,8 @@ class AssetManager: ObservableObject {
     }
 
     // MARK: - Data Operations
-    private func loadAssets() {
+    @MainActor
+    func loadAssets() async {
         isLoading = true
         error = nil
 
@@ -129,9 +148,10 @@ class AssetManager: ObservableObject {
         try storageManager.createBackup()
     }
 
-    func restoreFromBackup(at url: URL) throws {
+    @MainActor
+    func restoreFromBackup(at url: URL) async throws {
         try storageManager.restoreFromBackup(at: url)
-        loadAssets()
+        await loadAssets()
     }
 
     func getAssetHistory(for category: AssetCategory, months: Int) -> [AssetHistory] {
@@ -210,7 +230,7 @@ class AssetManager: ObservableObject {
             var categoryStr: String
             var quantityStr: String
             var nameStr: String
-            var noteStr = asset.note.replacingOccurrences(of: ",", with: "，") // 避免逗號影響CSV格式
+            let noteStr = asset.note.replacingOccurrences(of: ",", with: "，") // 避免逗號影響CSV格式
 
             switch asset.category {
             case .stock:

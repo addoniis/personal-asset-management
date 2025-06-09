@@ -7,10 +7,21 @@ struct Asset: Codable, Identifiable {
     var category: AssetCategory
     var name: String
     var value: Double
+    var currency: Currency = .twd  // 新增幣別屬性，預設為新台幣
     var note: String = ""
     var additionalInfo: [String: AdditionalInfoValue] = [:]
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+
+    // 轉換為新台幣的值
+    var valueInTWD: Double {
+        currency.convertToTWD(value)
+    }
+
+    // 格式化後的金額字串
+    var formattedValue: String {
+        currency.format(value)
+    }
 }
 
 // MARK: - Supporting Types

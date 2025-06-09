@@ -13,6 +13,24 @@ struct ProfileView: View {
     var body: some View {
         NavigationView {
             List {
+                Section {
+                    NavigationLink(destination: AnalyticsView()) {
+                        HStack {
+                            Image(systemName: "chart.pie.fill")
+                                .foregroundColor(.blue)
+                                .imageScale(.large)
+                            VStack(alignment: .leading) {
+                                Text("資產分析")
+                                    .font(.headline)
+                                Text("查看資產配置與分析")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+
                 Section(header: Text("個人資訊")) {
                     HStack {
                         Image(systemName: "person.circle.fill")

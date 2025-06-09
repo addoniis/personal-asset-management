@@ -42,7 +42,8 @@ struct StockView: View {
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "zh_TW")
         formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+        formatter.minimumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 
     private func updateStockValue(for asset: Asset, price: Double) {
@@ -243,7 +244,7 @@ struct StockRowView: View {
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "zh_TW")
         formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "NT$0"
+        return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 
     private func cancelFetchTask() {
@@ -358,7 +359,7 @@ struct StockEditView: View {
         formatter.locale = Locale(identifier: "zh_TW")
         formatter.minimumFractionDigits = includeDecimals ? 2 : 0
         formatter.maximumFractionDigits = includeDecimals ? 2 : 0
-        return formatter.string(from: NSNumber(value: value)) ?? "NT$0"
+        return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 
     private func formatPrice(_ price: Double) -> String {

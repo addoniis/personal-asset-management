@@ -33,7 +33,6 @@ struct TotalAssetsHeaderView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(Color(UIColor.systemBackground))
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 
     private func formatCurrencyAsInteger(_ value: Double) -> String {
@@ -43,7 +42,7 @@ struct TotalAssetsHeaderView: View {
         formatter.maximumFractionDigits = 0
         formatter.minimumFractionDigits = 0
         formatter.roundingMode = .down
-        return formatter.string(from: NSNumber(value: floor(value))) ?? "NT$0"
+        return formatter.string(from: NSNumber(value: floor(value)))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
 }
 

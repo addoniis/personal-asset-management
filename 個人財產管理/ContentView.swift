@@ -6,7 +6,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            CaseView()
+            CashView()
                 .tabItem {
                     Label("現金", systemImage: "dollarsign.circle")
                 }
@@ -20,13 +20,13 @@ struct ContentView: View {
 
             PropertyView()
                 .tabItem {
-                    Label("房產", systemImage: "house")
+                    Label("不動產", systemImage: "house")
                 }
                 .tag(2)
 
             InsuranceView()
                 .tabItem {
-                    Label("保險", systemImage: "heart.text.square")
+                    Label("保險", systemImage: "shield")
                 }
                 .tag(3)
 
