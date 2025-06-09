@@ -79,3 +79,25 @@ extension AssetCategory {
         }
     }
 }
+
+// 為 AssetCategory 添加顏色屬性
+extension AssetCategory {
+    var color: Color {
+        switch self {
+        case .cash:
+            return .blue
+        case .stock:
+            return .green
+        case .fund:
+            return .orange
+        case .property:
+            return .purple
+        case .insurance:
+            return .red
+        case .mortgage:
+            return .brown
+        case .other:
+            return .gray
+        }
+    }
+}

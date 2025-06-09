@@ -14,14 +14,14 @@ struct ProfileView: View {
         NavigationView {
             List {
                 Section {
-                    NavigationLink(destination: AnalyticsView()) {
+                    NavigationLink(destination: AssetDistributionView()) {
                         HStack {
                             Image(systemName: "chart.pie.fill")
                                 .foregroundColor(.blue)
                                 .imageScale(.large)
                             VStack(alignment: .leading) {
-                                Text("資產分析")
-                                Text("查看資產配置與趨勢")
+                                Text("資產分布")
+                                Text("查看資產配置與分析")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

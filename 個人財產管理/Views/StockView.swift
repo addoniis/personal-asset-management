@@ -56,12 +56,13 @@ struct StockView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
+            List {
+                Section {
                     TotalAssetsHeaderView()
-                        .padding(.bottom, 8)
+                        .listRowInsets(EdgeInsets())
+                }
 
-                    // 總覽區域
+                Section(header: Text("股票資產總覽")) {
                     VStack(spacing: 16) {
                         HStack {
                             Text("股票資產總覽")
@@ -119,34 +120,27 @@ struct StockView: View {
                         .padding(.top, 4)
                     }
                     .padding(.vertical)
-                    .background(Color(UIColor.systemBackground))
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                }
 
-                    // 股票類型選擇器
+                Section {
                     Picker("股票類型", selection: $stockType) {
                         ForEach(StockType.allCases, id: \.self) { type in
                             Text(type.rawValue).tag(type)
                         }
                     }
                     .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets())
                     .padding()
+                }
 
-                    // 股票列表
-                    LazyVStack(spacing: 0) {
-                        ForEach(filterStocks()) { asset in
-                            StockRowView(asset: asset, stockService: stockService, stockValues: $stockValues)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    selectedAsset = asset
-                                }
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-
-                            Divider()
-                                .padding(.horizontal)
-                        }
+                Section {
+                    ForEach(filterStocks()) { asset in
+                        StockRowView(asset: asset, stockService: stockService, stockValues: $stockValues)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedAsset = asset
+                            }
                     }
-                    .background(Color(UIColor.systemBackground))
                 }
             }
             .navigationTitle("股票")
