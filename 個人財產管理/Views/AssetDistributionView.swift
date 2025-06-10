@@ -23,21 +23,27 @@ struct AssetDistributionView: View {
                     Text("總資產")
                         .font(.headline)
                         .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top)
 
                     Text(formatAmount(assetManager.totalAssets))
                         .font(.system(size: 36, weight: .bold))
+                        .padding(.horizontal)
+                        .padding(.bottom)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
                 .shadow(radius: 1)
 
                 // 資產分布圓餅圖
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("資產分布")
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("資產分布圖")
                         .font(.headline)
                         .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     AssetPieChartView(
                         data: AssetCategory.allCases.map { category in
@@ -49,10 +55,9 @@ struct AssetDistributionView: View {
                         },
                         total: assetManager.totalAssets
                     )
-                    .frame(height: 280)
+                    .frame(height: 300)
+                    .padding(.vertical)
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
                 .shadow(radius: 1)
@@ -62,6 +67,8 @@ struct AssetDistributionView: View {
                     Text("詳細資產")
                         .font(.headline)
                         .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top)
 
                     ForEach(AssetCategory.allCases, id: \.self) { category in
                         let amount = assetManager.assetsByCategory[category] ?? 0
@@ -84,11 +91,12 @@ struct AssetDistributionView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
+                            .padding(.horizontal)
                             .padding(.vertical, 4)
                         }
                     }
+                    .padding(.bottom)
                 }
-                .padding()
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
                 .shadow(radius: 1)
