@@ -1,10 +1,16 @@
 import Foundation
 import Combine
 import SwiftUI
+// import Models // Removed: Not needed for types within the same target
+// import StorageManager // Removed: Not needed for types within the same target
+// import StockService // Removed: Not needed for types within the same target
+// import CSVImporter // Removed: Not needed for types within the same target
 
+@MainActor
 class AssetManager: ObservableObject {
     static let shared = AssetManager()
     private let storageManager = StorageManager.shared
+    private let stockService = StockService.shared
 
     @Published private(set) var assets: [Asset] = []
     @Published private(set) var assetHistory: [AssetHistory] = []
@@ -28,30 +34,87 @@ class AssetManager: ObservableObject {
     }
 
     var totalAssets: Double {
-        assets.reduce(0) { $0 + $1.value }
+        let cashAssets = assets.filter { $0.category == .cash }.reduce(0) { $0 + $1.valueInTWD }
+        let stockAssets = calculateStockTotalValue()
+        let fundAssets = assets.filter { $0.category == .fund }.reduce(0) { $0 + $1.valueInTWD }
+        let insuranceAssets = assets.filter { $0.category == .insurance }.reduce(0) { $0 + $1.valueInTWD }
+
+        let propertyValue = assets.filter { $0.category == .property }.reduce(0) { $0 + $1.valueInTWD }
+        let mortgageValue = assets.filter { $0.category == .mortgage }.reduce(0) { $0 + $1.valueInTWD }
+        let realEstateNetValue = propertyValue - mortgageValue
+
+        let otherAssets = assets.filter { $0.category == .other }.reduce(0) { $0 + $1.valueInTWD }
+
+        return cashAssets + stockAssets + fundAssets + insuranceAssets + realEstateNetValue + otherAssets
     }
 
     var totalCash: Double {
-        assets.filter { $0.category == .cash }.reduce(0) { $0 + $1.value }
+        assets.filter { $0.category == .cash }.reduce(0) { $0 + $1.valueInTWD }
     }
 
     var totalStocks: Double {
-        assets.filter { $0.category == .stock }.reduce(0) { $0 + $1.value }
+        calculateStockTotalValue()
     }
 
     var totalProperties: Double {
-        assets.filter { $0.category == .property }.reduce(0) { $0 + $1.value }
+        assets.filter { $0.category == .property }.reduce(0) { $0 + $1.valueInTWD }
     }
 
     var totalInsurance: Double {
-        assets.filter { $0.category == .insurance }.reduce(0) { $0 + $1.value }
+        assets.filter { $0.category == .insurance }.reduce(0) { $0 + $1.valueInTWD }
     }
 
     var assetsByCategory: [AssetCategory: Double] {
-        Dictionary(grouping: assets, by: { $0.category })
-            .mapValues { assets in
-                assets.reduce(0) { $0 + $1.value }
+        var categorizedAssets: [AssetCategory: Double] = [
+            .cash: 0,
+            .stock: 0,
+            .fund: 0,
+            .insurance: 0,
+            .property: 0,
+            .mortgage: 0,
+            .other: 0
+        ]
+
+        for asset in assets {
+            if asset.category == .property {
+                categorizedAssets[.property] = (categorizedAssets[.property] ?? 0) + asset.valueInTWD
+            } else if asset.category == .mortgage {
+                categorizedAssets[.property] = (categorizedAssets[.property] ?? 0) - asset.valueInTWD
+            } else if asset.category == .stock {
+                guard let shares = asset.additionalInfo["shares"]?.double,
+                      let stockMarket = asset.additionalInfo["stockMarket"]?.string else {
+                    categorizedAssets[.stock] = (categorizedAssets[.stock] ?? 0) + asset.valueInTWD
+                    continue
+                }
+
+                let symbol = asset.name
+                var currentPrice: Double?
+
+                if stockMarket == "台股" {
+                    let formattedSymbol = symbol.hasSuffix(".TW") ? symbol : "\(symbol).TW"
+                    currentPrice = stockService.currentStockPrices[formattedSymbol]
+                } else if stockMarket == "美股" {
+                    currentPrice = stockService.currentStockPrices[symbol]
+                }
+
+                if let price = currentPrice {
+                    let marketValue = price * shares
+                    if asset.currency == .usd {
+                        categorizedAssets[.stock] = (categorizedAssets[.stock] ?? 0) + (marketValue * stockService.usdExchangeRate)
+                    } else {
+                        categorizedAssets[.stock] = (categorizedAssets[.stock] ?? 0) + marketValue
+                    }
+                } else {
+                    categorizedAssets[.stock] = (categorizedAssets[.stock] ?? 0) + asset.valueInTWD
+                }
+            } else {
+                categorizedAssets[asset.category] = (categorizedAssets[asset.category] ?? 0) + asset.valueInTWD
             }
+        }
+
+        categorizedAssets.removeValue(forKey: .mortgage)
+
+        return categorizedAssets
     }
 
     var monthlyGrowthRate: Double {
@@ -66,8 +129,22 @@ class AssetManager: ObservableObject {
     init() {
         Task {
             await loadAssets()
+            await fetchRealtimeStockPrices()
         }
         loadHistory()
+        stockService.$currentStockPrices
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        stockService.$usdExchangeRate
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - CRUD Operations
@@ -75,6 +152,7 @@ class AssetManager: ObservableObject {
         assets.append(asset)
         saveAssets()
         updateHistory()
+        Task { await fetchRealtimeStockPrices() }
     }
 
     func updateAsset(_ asset: Asset) {
@@ -82,6 +160,7 @@ class AssetManager: ObservableObject {
             assets[index] = asset
             saveAssets()
             updateHistory()
+            Task { await fetchRealtimeStockPrices() }
         }
     }
 
@@ -89,6 +168,7 @@ class AssetManager: ObservableObject {
         assets.removeAll { $0.id == asset.id }
         saveAssets()
         updateHistory()
+        Task { await fetchRealtimeStockPrices() }
     }
 
     // MARK: - Data Operations
@@ -107,6 +187,74 @@ class AssetManager: ObservableObject {
         isLoading = false
     }
 
+//    @MainActor
+//    func fetchRealtimeStockPrices() async {
+//        for asset in assets.filter({ $0.category == .stock }) {
+//            guard let stockSymbol = asset.additionalInfo["symbol"]?.string ?? asset.name,
+//                  let isUSStock = asset.additionalInfo["isUSStock"]?.string == "true" else {
+//                continue
+//            }
+//            do {
+//                let price = try await (isUSStock
+//                    ? stockService.fetchUSStockPrice(symbol: stockSymbol)
+//                    : stockService.fetchTWStockPrice(symbol: stockSymbol))
+//            } catch {
+//                print("Error fetching price for \(stockSymbol) in AssetManager: \(error)")
+//            }
+//        }
+//    }
+//    @MainActor
+//    func fetchRealtimeStockPrices() async {
+//        for asset in assets.filter({ $0.category == .stock }) {
+//            // stockSymbol: 如果 additionalInfo 中有 symbol 且為 string，就用它，否則用 asset.name
+//            let stockSymbol = asset.additionalInfo?["symbol"]?.string ?? asset.name
+//
+//            // isUSStock: 判斷 additionalInfo 中 isUSStock 鍵的值是否為 "true"
+//            // 這裡不需要 guard let 或 else { continue }
+//            let isUSStock = (asset.additionalInfo?["isUSStock"]?.string == "true")
+//            // 注意：如果 additionalInfo?["isUSStock"]?.string 是 nil，這個比較結果會是 false，這是預期的行為。
+//            
+//            do {
+//                let price = try await (isUSStock
+//                    ? stockService.fetchUSStockPrice(symbol: stockSymbol)
+//                    : stockService.fetchTWStockPrice(symbol: stockSymbol))
+//                // price 現在在這裡可用
+//                // 你需要使用這個 price，例如更新 assetManager 中的資產
+//                // assetManager.updateAssetPrice(symbol: stockSymbol, newPrice: price) // 假設你有這樣的方法
+//                print("Fetched price for \(stockSymbol): \(price)")
+//            } catch {
+//                print("Error fetching price for \(stockSymbol) in AssetManager: \(error)")
+//            }
+//        }
+//    }
+    @MainActor
+    func fetchRealtimeStockPrices() async {
+        for asset in assets.filter({ $0.category == .stock }) {
+            // 修正 stockSymbol 的處理
+            // 移除 asset.additionalInfo 後面的 "?"
+            // 並使用 as? String 來安全地轉換為 String?
+            let stockSymbol = (asset.additionalInfo["symbol"] as? String) ?? asset.name
+
+            // 修正 isUSStock 的處理
+            // 移除 asset.additionalInfo 後面的 "?"
+            // 並使用 as? String 來安全地轉換為 String?
+            let isUSStock = (asset.additionalInfo["isUSStock"] as? String == "true")
+            
+            do {
+                let price = try await (isUSStock
+                    ? stockService.fetchUSStockPrice(symbol: stockSymbol)
+                    : stockService.fetchTWStockPrice(symbol: stockSymbol))
+                
+                // 你需要使用這個 price，例如更新 assetManager 中的資產
+                // 假設你在 AssetManager 中有一個方法來更新資產的價格
+                // assetManager.updateAssetPrice(symbol: stockSymbol, newPrice: price)
+                
+                print("Fetched price for \(stockSymbol): \(price)")
+            } catch {
+                print("Error fetching price for \(stockSymbol) in AssetManager: \(error)")
+            }
+        }
+    }
     private func saveAssets() {
         do {
             try storageManager.saveAssets(assets)
@@ -140,7 +288,11 @@ class AssetManager: ObservableObject {
     }
 
     func totalValue(for category: AssetCategory? = nil) -> Double {
-        assets(for: category).reduce(0) { $0 + $1.value }
+        if category == .stock {
+            return totalStocks
+        }
+        guard let category = category else { return totalAssets }
+        return assets(for: category).reduce(0) { $0 + $1.valueInTWD }
     }
 
     // MARK: - Backup & Restore
@@ -265,6 +417,36 @@ class AssetManager: ObservableObject {
         }
 
         return csv
+    }
+
+    private func calculateStockTotalValue() -> Double {
+        assets.filter { $0.category == .stock }.reduce(0) { total, asset in
+            guard let shares = asset.additionalInfo["shares"]?.double,
+                  let stockMarket = asset.additionalInfo["stockMarket"]?.string else {
+                return total + asset.valueInTWD
+            }
+
+            let symbol = asset.name
+            var currentPrice: Double?
+
+            if stockMarket == "台股" {
+                let formattedSymbol = symbol.hasSuffix(".TW") ? symbol : "\(symbol).TW"
+                currentPrice = stockService.currentStockPrices[formattedSymbol]
+            } else if stockMarket == "美股" {
+                currentPrice = stockService.currentStockPrices[symbol]
+            }
+
+            if let price = currentPrice {
+                let marketValue = price * shares
+                if asset.currency == .usd {
+                    return total + (marketValue * stockService.usdExchangeRate)
+                } else {
+                    return total + marketValue
+                }
+            } else {
+                return total + asset.valueInTWD
+            }
+        }
     }
 }
 

@@ -21,6 +21,10 @@ struct PropertyView: View {
         totalValue - totalLoan
     }
 
+    private var mortgageAssets: [Asset] {
+        assetManager.assets(for: .mortgage)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -81,13 +85,21 @@ struct PropertyView: View {
                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                 }
 
-                List {
+                // === 房產清單 ===
+                Section(header: Text("房產清單")) {
                     ForEach(propertyAssets) { asset in
                         PropertyRowView(asset: asset)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedAsset = asset
                             }
+                    }
+                }
+
+                // === 房貸清單 ===
+                Section(header: Text("房貸清單")) {
+                    ForEach(mortgageAssets) { asset in
+                        MortgageRowView(asset: asset)
                     }
                 }
             }
@@ -178,6 +190,41 @@ struct PropertyRowView: View {
                 }
             }
 
+            if let note = asset.additionalInfo["note"]?.string, !note.isEmpty {
+                Text(note)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func formatCurrencyAsInteger(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "zh_TW")
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    }
+}
+
+struct MortgageRowView: View {
+    let asset: Asset
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(asset.name)
+                    .font(.headline)
+                Spacer()
+                Text(formatCurrencyAsInteger(asset.value))
+                    .foregroundColor(.red)
+            }
+            if let rate = asset.additionalInfo["rate"]?.double {
+                Text("利率：\(String(format: "%.2f", rate))%")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             if let note = asset.additionalInfo["note"]?.string, !note.isEmpty {
                 Text(note)
                     .font(.caption)

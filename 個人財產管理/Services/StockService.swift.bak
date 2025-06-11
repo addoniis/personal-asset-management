@@ -1,6 +1,5 @@
 import Foundation
 import Combine
-import SwiftUI
 
 @globalActor actor StockServiceActor {
     static let shared = StockServiceActor()
@@ -11,7 +10,6 @@ class StockService: ObservableObject {
     static let shared = StockService()
 
     @Published var usdExchangeRate: Double = 31.0  // 預設匯率
-    @Published var currentStockPrices: [String: Double] = [:]
     private var cancellables = Set<AnyCancellable>()
     private let yahooFinanceBaseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
     private let maxRetries = 3
@@ -24,75 +22,59 @@ class StockService: ObservableObject {
         return request
     }
 
-    // 獲取台股即時價格
+    // 獲取台股收盤價（台灣證交所 OpenAPI，自動去除 .TW/.TWO）
     func fetchTWStockPrice(symbol: String) async throws -> Double {
-        let formattedSymbol = symbol.hasSuffix(".TW") ? symbol : "\(symbol).TW"
-        let urlString = "\(yahooFinanceBaseURL)/\(formattedSymbol)?interval=1d&range=1d"
-
-        print("Fetching TW stock price from: \(urlString)")
-
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+        let url = URL(string: "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "台灣證交所 API 回傳格式錯誤"])
         }
-
-        let request = createRequest(url: url)
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
+        // 自動去除 .TW、.TWO
+        let code = symbol.replacingOccurrences(of: ".TW", with: "").replacingOccurrences(of: ".TWO", with: "")
+        if let stock = jsonArray.first(where: { $0["Code"] as? String == code }),
+           let priceString = stock["ClosingPrice"] as? String,
+           let price = Double(priceString) {
+            return price
+        } else {
+            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "查無此股票或暫無報價"])
         }
-
-        print("Response status code: \(httpResponse.statusCode)")
-
-        guard httpResponse.statusCode == 200 else {
-            throw URLError(.badServerResponse)
-        }
-
-        let decoder = JSONDecoder()
-        let result = try decoder.decode(YahooFinanceResponse.self, from: data)
-
-        guard let price = result.chart.result.first?.meta.regularMarketPrice else {
-            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "無法解析股價"])
-        }
-        self.currentStockPrices[formattedSymbol] = price
-        return price
     }
 
-    // 獲取美股即時價格
+    // 獲取美股即時價格（改用 Finnhub API）
     func fetchUSStockPrice(symbol: String) async throws -> Double {
-        let urlString = "\(yahooFinanceBaseURL)/\(symbol)?interval=1d&range=1d"
-
+//        let apiKey = "d13t24hr01qs7gljnvhgd13t24hr01qs7gljnvi0"
+        let apiKey = "d13tic9r01qs7gljqfd0d13tic9r01qs7gljqfdg"
+        let urlString = "https://finnhub.io/api/v1/quote?symbol=\(symbol)&token=\(apiKey)"
         print("Fetching US stock price from: \(urlString)")
 
         guard let url = URL(string: urlString) else {
             throw URLError(.badURL)
         }
 
-        let request = createRequest(url: url)
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
 
-        print("Response status code: \(httpResponse.statusCode)")
+        let jsonString = String(data: data, encoding: .utf8) ?? ""
+        print("Finnhub 回傳: \(jsonString)")
 
-        guard httpResponse.statusCode == 200 else {
-            throw URLError(.badServerResponse)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "API 回傳格式錯誤"])
         }
 
-        let decoder = JSONDecoder()
-        let result = try decoder.decode(YahooFinanceResponse.self, from: data)
-
-        guard let price = result.chart.result.first?.meta.regularMarketPrice else {
-            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "無法解析股價"])
+        if let error = json["error"] as? String {
+            throw NSError(domain: "StockService", code: -2, userInfo: [NSLocalizedDescriptionKey: error])
         }
-        self.currentStockPrices[symbol] = price
+
+        guard let price = json["c"] as? Double, price > 0 else {
+            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "查無此股票或暫無報價"])
+        }
         return price
     }
 
     // 獲取美元匯率
-    func fetchUSDExchangeRate() {
+    private func fetchUSDExchangeRate() {
         let urlString = "\(yahooFinanceBaseURL)/TWD=X?interval=1d&range=1d"
         guard let url = URL(string: urlString) else { return }
 

@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import UniformTypeIdentifiers
 
 struct InputAssetsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -31,6 +32,11 @@ struct InputAssetsView: View {
     @State private var mortgageBank = ""
     @State private var mortgageBalance = ""
     @State private var mortgageRate = ""
+
+    @State private var showDocumentPicker = false
+    @State private var parsedAssets: [Asset] = []
+    @State private var showReview = false
+    @State private var importError: String?
 
     var headerView: some View {
         VStack {
@@ -160,6 +166,62 @@ struct InputAssetsView: View {
                 }
 
                 Spacer()
+
+                // === CSV 匯入區塊 ===
+                Divider()
+                Button("匯入 CSV 檔案") {
+                    showDocumentPicker = true
+                }
+                .fileImporter(
+                    isPresented: $showDocumentPicker,
+                    allowedContentTypes: [UTType.commaSeparatedText, UTType.text],
+                    allowsMultipleSelection: false
+                ) { result in
+                    switch result {
+                    case .success(let urls):
+                        if let url = urls.first, let data = try? Data(contentsOf: url), let csvString = String(data: data, encoding: .utf8) {
+                            parsedAssets = CSVImporter.importAssets(from: csvString)
+                            if parsedAssets.isEmpty {
+                                importError = "CSV 解析失敗或無有效資料"
+                            } else {
+                                importError = nil
+                                showReview = true
+                            }
+                        } else {
+                            importError = "無法讀取檔案內容"
+                        }
+                    case .failure(let error):
+                        importError = "檔案選擇失敗：\(error.localizedDescription)"
+                    }
+                }
+
+                if let importError = importError {
+                    Text(importError)
+                        .foregroundColor(.red)
+                }
+
+                if showReview {
+                    List(parsedAssets) { asset in
+                        VStack(alignment: .leading) {
+                            Text(asset.name)
+                            Text("類別：\(asset.category.displayName)")
+                            Text("金額：\(asset.value)")
+                        }
+                    }
+                    .frame(height: 300)
+
+                    Button("確認導入") {
+                        for asset in parsedAssets {
+                            assetManager.addAsset(asset)
+                        }
+                        showReview = false
+                        parsedAssets = []
+                    }
+                    .padding()
+                    .foregroundColor(.white)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+                }
             }
             .navigationTitle("輸入財產")
         }

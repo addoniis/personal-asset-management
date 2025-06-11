@@ -14,6 +14,8 @@ class StockService: ObservableObject {
     @Published var currentStockPrices: [String: Double] = [:]
     private var cancellables = Set<AnyCancellable>()
     private let yahooFinanceBaseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
+    private let finnhubBaseURL = "https://finnhub.io/api/v1"
+    private let finnhubAPIKey = "d13tic9r01qs7gljqfd0d13tic9r01qs7gljqfdg" // **請替換為您的 Finnhub API Key**
     private let maxRetries = 3
     private let retryDelay: TimeInterval = 2.0
 
@@ -24,7 +26,7 @@ class StockService: ObservableObject {
         return request
     }
 
-    // 獲取台股即時價格
+    // 獲取台股即時價格 (繼續使用 Yahoo Finance)
     func fetchTWStockPrice(symbol: String) async throws -> Double {
         let formattedSymbol = symbol.hasSuffix(".TW") ? symbol : "\(symbol).TW"
         let urlString = "\(yahooFinanceBaseURL)/\(formattedSymbol)?interval=1d&range=1d"
@@ -55,14 +57,19 @@ class StockService: ObservableObject {
             throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "無法解析股價"])
         }
         self.currentStockPrices[formattedSymbol] = price
+        print("Fetched price for \(formattedSymbol): \(price)")
         return price
     }
 
-    // 獲取美股即時價格
+    // 獲取美股即時價格 (使用 Finnhub)
     func fetchUSStockPrice(symbol: String) async throws -> Double {
-        let urlString = "\(yahooFinanceBaseURL)/\(symbol)?interval=1d&range=1d"
+        guard !finnhubAPIKey.isEmpty else {
+            print("Finnhub API Key is not set.")
+            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Finnhub API Key is not set."])
+        }
+        let urlString = "\(finnhubBaseURL)/quote?symbol=\(symbol)&token=\(finnhubAPIKey)"
 
-        print("Fetching US stock price from: \(urlString)")
+        print("Fetching US stock price from Finnhub: \(urlString)")
 
         guard let url = URL(string: urlString) else {
             throw URLError(.badURL)
@@ -75,23 +82,24 @@ class StockService: ObservableObject {
             throw URLError(.badServerResponse)
         }
 
-        print("Response status code: \(httpResponse.statusCode)")
+        print("Finnhub Response status code: \(httpResponse.statusCode)")
 
         guard httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
 
         let decoder = JSONDecoder()
-        let result = try decoder.decode(YahooFinanceResponse.self, from: data)
+        let result = try decoder.decode(FinnhubQuoteResponse.self, from: data)
 
-        guard let price = result.chart.result.first?.meta.regularMarketPrice else {
-            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "無法解析股價"])
+        guard let price = result.c, price > 0 else {
+            throw NSError(domain: "StockService", code: -1, userInfo: [NSLocalizedDescriptionKey: "無法解析美股股價或價格無效"])
         }
         self.currentStockPrices[symbol] = price
+        print("Fetched price for \(symbol) from Finnhub: \(price)")
         return price
     }
 
-    // 獲取美元匯率
+    // 獲取美元匯率 (繼續使用 Yahoo Finance)
     func fetchUSDExchangeRate() {
         let urlString = "\(yahooFinanceBaseURL)/TWD=X?interval=1d&range=1d"
         guard let url = URL(string: urlString) else { return }
@@ -107,6 +115,7 @@ class StockService: ObservableObject {
 
                 if let rate = result.chart.result.first?.meta.regularMarketPrice {
                     self.usdExchangeRate = rate  // 直接使用 TWD/USD 匯率
+                    print("Fetched USD Exchange Rate: \(rate)")
                 }
             } catch {
                 print("Error fetching exchange rate: \(error)")
@@ -170,4 +179,14 @@ struct YahooFinanceResponse: Codable {
             }
         }
     }
+}
+
+// Finnhub Quote API 回應結構
+struct FinnhubQuoteResponse: Codable {
+    let c: Double? // Current price
+    let h: Double?
+    let l: Double?
+    let o: Double?
+    let pc: Double?
+    let t: Int?
 }

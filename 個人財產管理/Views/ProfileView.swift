@@ -9,6 +9,8 @@ struct ProfileView: View {
     @State private var showingExportSheet = false
     @State private var showingImportAlert = false
     @State private var importAlertMessage = ""
+    @State private var parsedAssets: [Asset] = []
+    @State private var showReviewSheet = false
 
     var body: some View {
         NavigationView {
@@ -116,9 +118,13 @@ struct ProfileView: View {
 
                     do {
                         let fileContent = try String(contentsOf: selectedFile, encoding: .utf8)
-                        assetManager.importAssetsFromCSV(fileContent)
-                        importAlertMessage = "匯入成功！"
-                        showingImportAlert = true
+                        parsedAssets = CSVImporter.importAssets(from: fileContent)
+                        if parsedAssets.isEmpty {
+                            importAlertMessage = "CSV 解析失敗或無有效資料"
+                            showingImportAlert = true
+                        } else {
+                            showReviewSheet = true
+                        }
                     } catch {
                         importAlertMessage = "匯入失敗：\(error.localizedDescription)"
                         showingImportAlert = true
@@ -127,6 +133,43 @@ struct ProfileView: View {
                 case .failure(let error):
                     importAlertMessage = "選擇檔案失敗：\(error.localizedDescription)"
                     showingImportAlert = true
+                }
+            }
+            .sheet(isPresented: $showReviewSheet) {
+                NavigationView {
+                    VStack {
+                        Text("請確認匯入資料")
+                            .font(.headline)
+                            .padding()
+                        List(parsedAssets) { asset in
+                            VStack(alignment: .leading) {
+                                Text(asset.name)
+                                Text("類別：\(asset.category.displayName)")
+                                Text("金額：\(asset.value)")
+                            }
+                        }
+                        .frame(height: 300)
+                        Button("確認導入") {
+                            for asset in parsedAssets {
+                                assetManager.addAsset(asset)
+                            }
+                            showReviewSheet = false
+                            parsedAssets = []
+                            importAlertMessage = "匯入成功！"
+                            showingImportAlert = true
+                        }
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                        Button("取消") {
+                            showReviewSheet = false
+                            parsedAssets = []
+                        }
+                        .padding(.top, 8)
+                    }
+                    .navigationTitle("匯入預覽")
+                    .navigationBarTitleDisplayMode(.inline)
                 }
             }
             .sheet(isPresented: $showingExportSheet) {
@@ -166,7 +209,7 @@ struct AboutView: View {
                 }
 
                 Section(header: Text("開發者資訊")) {
-                    Text("開發者：Adonis")
+                    Text("開發者：Adonis, 旭哥, 阿嘉")
                 }
             }
             .navigationTitle("關於")
