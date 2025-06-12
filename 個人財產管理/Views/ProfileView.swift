@@ -107,6 +107,34 @@ struct ProfileView: View {
             } message: {
                 Text("確定要重置所有用戶資料嗎？此操作無法撤銷。")
             }
+//            .fileImporter(
+//                isPresented: $showingImportPicker,
+//                allowedContentTypes: [.commaSeparatedText],
+//                allowsMultipleSelection: false
+//            ) { result in
+//                switch result {
+//                case .success(let files):
+//                    guard let selectedFile = files.first else { return }
+//
+//                    do {
+//                        let fileContent = try String(contentsOf: selectedFile, encoding: .utf8)
+//                        parsedAssets = CSVImporter.importAssets(from: fileContent)
+//                        if parsedAssets.isEmpty {
+//                            importAlertMessage = "CSV 解析失敗或無有效資料"
+//                            showingImportAlert = true
+//                        } else {
+//                            showReviewSheet = true
+//                        }
+//                    } catch {
+//                        importAlertMessage = "匯入失敗：\(error.localizedDescription)"
+//                        showingImportAlert = true
+//                    }
+//
+//                case .failure(let error):
+//                    importAlertMessage = "選擇檔案失敗：\(error.localizedDescription)"
+//                    showingImportAlert = true
+//                }
+//            }
             .fileImporter(
                 isPresented: $showingImportPicker,
                 allowedContentTypes: [.commaSeparatedText],
@@ -115,6 +143,21 @@ struct ProfileView: View {
                 switch result {
                 case .success(let files):
                     guard let selectedFile = files.first else { return }
+
+                    // *** 核心解決方案：啟動安全存取範圍資源 ***
+                    let accessGranted = selectedFile.startAccessingSecurityScopedResource()
+                    if !accessGranted {
+                        // 如果無法獲取權限，則直接返回或顯示錯誤
+                        importAlertMessage = "無法獲取檔案讀取權限。"
+                        showingImportAlert = true
+                        return
+                    }
+
+                    // *** 修正這裡：使用 defer 替代 finally ***
+                    defer {
+                        // 無論 do 區塊是成功完成還是拋出錯誤，這裡的程式碼都會執行
+                        selectedFile.stopAccessingSecurityScopedResource()
+                    }
 
                     do {
                         let fileContent = try String(contentsOf: selectedFile, encoding: .utf8)
@@ -134,8 +177,8 @@ struct ProfileView: View {
                     importAlertMessage = "選擇檔案失敗：\(error.localizedDescription)"
                     showingImportAlert = true
                 }
-            }
-            .sheet(isPresented: $showReviewSheet) {
+            
+            }            .sheet(isPresented: $showReviewSheet) {
                 NavigationView {
                     VStack {
                         Text("請確認匯入資料")

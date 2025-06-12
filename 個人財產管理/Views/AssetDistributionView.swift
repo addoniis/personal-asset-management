@@ -24,14 +24,15 @@ struct AssetDistributionView: View {
         let mortgageValue = mortgageAssets.reduce(0) { $0 + $1.value }
         let realEstateNetValue = propertyValue - mortgageValue
 
-        let pieData: [(String, Double, Color)] = [
+        let rawPieData: [(String, Double, Color)] = [
             (AssetCategory.cash.rawValue, assetManager.assetsByCategory[.cash] ?? 0, AssetCategory.cash.color),
             (AssetCategory.stock.rawValue, assetManager.assetsByCategory[.stock] ?? 0, AssetCategory.stock.color), // Use real-time stock value from AssetManager
             (AssetCategory.fund.rawValue, assetManager.assetsByCategory[.fund] ?? 0, AssetCategory.fund.color),
             (AssetCategory.insurance.rawValue, assetManager.assetsByCategory[.insurance] ?? 0, AssetCategory.insurance.color),
             ("不動產", realEstateNetValue, AssetCategory.property.color),
             (AssetCategory.other.rawValue, assetManager.assetsByCategory[.other] ?? 0, AssetCategory.other.color)
-        ]//.filter { $0.1 != 0 }
+        ]
+        let pieData = rawPieData.filter { $0.1 != 0 }
         let total = pieData.reduce(0) { $0 + $1.1 }
 
         ScrollView {
