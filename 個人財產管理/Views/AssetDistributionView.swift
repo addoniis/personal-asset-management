@@ -32,9 +32,18 @@ struct AssetDistributionView: View {
             ("不動產", realEstateNetValue, AssetCategory.property.color),
             (AssetCategory.other.rawValue, assetManager.assetsByCategory[.other] ?? 0, AssetCategory.other.color)
         ]
-        let pieData = rawPieData.filter { $0.1 != 0 }
-        let total = pieData.reduce(0) { $0 + $1.1 }
+        // MARK: - 圓餅圖數據處理與排序
 
+        // 1. 過濾掉值為 0 的數據
+        let filteredPieData = rawPieData.filter { $0.1 != 0 }
+            
+        // 2. 根據數值 (item.1) 進行降序排序，使圓餅圖按比例大小依序繪製
+        let pieData = filteredPieData.sorted { $0.1 > $1.1 }
+
+        // 3. 計算總和 (total) 應該基於排序和過濾後的 pieData
+        let total = pieData.reduce(0) { $0 + $1.1 }
+        
+        
         ScrollView {
             VStack(spacing: 24) {
                 // 總資產卡片
@@ -49,6 +58,13 @@ struct AssetDistributionView: View {
                         .font(.system(size: 36, weight: .bold))
                         .padding(.horizontal)
                         .padding(.bottom)
+                    Text(formatCurrencyInWan(assetManager.totalAssets))
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.systemBackground))
@@ -117,6 +133,16 @@ struct AssetDistributionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(.systemGroupedBackground))
     }
+    private func formatCurrencyInWan(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        formatter.usesGroupingSeparator = true
+
+        let wan = floor(value / 10000)
+        return "(\(formatter.string(from: NSNumber(value: wan)) ?? "0")萬)"
+    }
+
 }
 
 #Preview {

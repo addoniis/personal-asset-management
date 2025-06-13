@@ -35,7 +35,7 @@ struct AssetPieChartView: View {
     private func pieChartContent(geometry: GeometryProxy) -> some View {
         let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
         let radius = min(geometry.size.width, geometry.size.height) * 0.38
-        let labelRadius = radius * 1.2
+        let labelRadius = radius * 1.35 //調整文字跟圖餅圖的距離
 
         ZStack {
             ForEach(Array(data.enumerated()), id: \.offset) { index, item in
@@ -45,6 +45,12 @@ struct AssetPieChartView: View {
                 }
             }
         }
+//        .rotation3DEffect(
+//            .degrees(20), // 傾斜角度
+//            axis: (x: 1.0, y: 0.0, z: 0.0), // 沿 X 軸旋轉
+//            anchor: .center,
+//            perspective: 0.3 // 景深效果
+//        )
     }
 
     @ViewBuilder
@@ -60,6 +66,12 @@ struct AssetPieChartView: View {
                         clockwise: false)
         }
         .fill(item.2)
+
+        .fill(LinearGradient(gradient: Gradient(colors: [item.2.opacity(0.8), item.2]), startPoint: .topLeading, endPoint: .bottomTrailing))
+        // 為每個扇區添加一個白色邊框，使其視覺上更清晰、有分隔感
+        .stroke(Color.white, lineWidth: 2) // 這條是扇區之間的白邊
+//        .stroke(Color.white.opacity(0.5), lineWidth: 1) // 淺色邊框
+        .shadow(color: Color.black.opacity(0.4), radius: 5, x: 0, y: 5)
     }
 
     @ViewBuilder
@@ -79,9 +91,9 @@ struct AssetPieChartView: View {
 
         VStack(spacing: 2) {
             Text(item.0)
-                .font(.caption)
+                .font(.title3)
             Text(formatPercentage(item.1))
-                .font(.caption)
+                .font(.title3)
                 .foregroundColor(.secondary)
         }
         .multilineTextAlignment(.center)

@@ -7,6 +7,7 @@ struct TotalAssetsHeaderView: View {
     private var totalAssets: Double {
         let cashAssets = assetManager.assets(for: .cash).reduce(0) { $0 + $1.value }
         let propertyAssets = assetManager.assets(for: .property).reduce(0) { $0 + $1.value }
+        let mortgageAssets = assetManager.assets(for: .mortgage).reduce(0) { $0 + $1.value }
         let insuranceAssets = assetManager.assets(for: .insurance).reduce(0) { $0 + $1.value }
 
         // 股票資產需要特別處理，因為有美股轉換
@@ -15,9 +16,9 @@ struct TotalAssetsHeaderView: View {
         let usStocks = stockAssets.filter { $0.additionalInfo["isUSStock"]?.string == "true" }
 
         let twStockValue = twStocks.reduce(0) { $0 + $1.value }
-        let usStockValue = usStocks.reduce(0) { $0 + $1.value } * stockService.usdExchangeRate
+        let usStockValue = usStocks.reduce(0) { $0 + $1.value }
 
-        return cashAssets + twStockValue + usStockValue + propertyAssets + insuranceAssets
+        return cashAssets + twStockValue + usStockValue + propertyAssets + insuranceAssets - mortgageAssets
     }
 
     var body: some View {
