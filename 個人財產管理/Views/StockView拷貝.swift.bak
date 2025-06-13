@@ -1,9 +1,4 @@
 import SwiftUI
-//import AssetManager // 確保這些模組有被正確導入
-//import StockService
-//import Models
-//import TotalAssetsHeaderView
-//import AssetEditMode
 
 struct StockView: View {
     @EnvironmentObject var assetManager: AssetManager
@@ -152,17 +147,8 @@ struct StockView: View {
             .navigationTitle("股票")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack { // 使用 HStack 包裹兩個按鈕
-                        Button(action: {
-                            // 手動觸發價格更新
-                            Task { await assetManager.fetchRealtimeStockPrices() }
-                        }) {
-                            Image(systemName: "arrow.triangle.2.circlepath") // 刷新圖標
-                        }
-                        
-                        Button(action: { showingAddSheet = true }) {
-                            Image(systemName: "plus")
-                        }
+                    Button(action: { showingAddSheet = true }) {
+                        Image(systemName: "plus")
                     }
                 }
             }
@@ -185,7 +171,6 @@ struct StockView: View {
                 }
             }
             .onAppear {
-                // 應用第一次載入時自動刷新一次價格
                 Task { await assetManager.fetchRealtimeStockPrices() }
             }
         }
@@ -219,9 +204,11 @@ struct StockView: View {
 
 struct StockRowView: View {
     let asset: Asset
-    @ObservedObject var stockService: StockService // 保持為 @ObservedObject，確保響應 stockService 的更新
-    // 移除 @State private var currentPrice: Double? 和相關的 isLoading, error, fetchTask
-    // 因為現在 StockRowView 應直接從 stockService 中獲取價格
+    @ObservedObject var stockService: StockService
+    @State private var currentPrice: Double?
+    @State private var isLoading = false
+    @State private var error: String?
+    @State private var fetchTask: Task<Void, Never>?
 
     private var isUSStock: Bool {
         asset.additionalInfo["isUSStock"]?.string == "true"
@@ -236,24 +223,15 @@ struct StockRowView: View {
     }
 
     private var totalValue: Double {
-        // 直接使用 stockService.currentStockPrices
+        // Use stockService.currentStockPrices directly
         let symbol = isUSStock ? asset.name : (asset.name.hasSuffix(".TW") ? asset.name : "\(asset.name).TW")
-        guard let price = stockService.currentStockPrices[symbol] else {
-            // 如果即時價格尚未載入，則回退到資產的原始價值
-            // 這確保在價格載入前不會顯示空白或 0
-            return asset.valueInTWD
-        }
+        guard let price = stockService.currentStockPrices[symbol] else { return asset.valueInTWD } // Fallback to asset.valueInTWD
 
         if isUSStock {
             return Double(shares) * price * stockService.usdExchangeRate
         } else {
             return Double(shares) * price
         }
-    }
-
-    private var currentDisplayPrice: Double {
-        let symbol = isUSStock ? asset.name : (asset.name.hasSuffix(".TW") ? asset.name : "\(asset.name).TW")
-        return stockService.currentStockPrices[symbol] ?? 0.0 // 如果沒有價格則顯示 0.0
     }
 
     private func formatCurrency(_ value: Double) -> String {
@@ -263,10 +241,43 @@ struct StockRowView: View {
         formatter.maximumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
-    
-    // 移除 fetchStockPrice() 和 cancelFetchTask() 函數，因為它們不再被使用
-    // private func cancelFetchTask() { ... }
-    // func fetchStockPrice() { ... }
+
+    private func cancelFetchTask() {
+        fetchTask?.cancel()
+        fetchTask = nil
+    }
+
+    func fetchStockPrice() {
+        cancelFetchTask()
+
+        isLoading = true
+        error = nil
+
+        fetchTask = Task {
+            do {
+                if Task.isCancelled { return }
+
+                let stockSymbol = asset.additionalInfo["symbol"]?.string ?? asset.name
+                currentPrice = try await isUSStock ?
+                    stockService.fetchUSStockPrice(symbol: stockSymbol) :
+                    stockService.fetchTWStockPrice(symbol: stockSymbol)
+
+                // Removed: stockValues[asset.id.uuidString] = value
+            } catch is CancellationError {
+                // Ignore cancellation errors
+                return
+            } catch {
+                if !Task.isCancelled {
+                    self.error = "無法獲取價格"
+                    print("Error fetching stock price: \(error)")
+                }
+            }
+
+            if !Task.isCancelled {
+                isLoading = false
+            }
+        }
+    }
 
     var body: some View {
         HStack {
@@ -281,35 +292,40 @@ struct StockRowView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                // 這裡直接使用 currentDisplayPrice，它會自動從 stockService 中獲取最新價格
-                if isUSStock {
-                    Text("$\(String(format: "%.2f", currentDisplayPrice))")
-                        .font(.headline)
-                    Text(formatCurrency(totalValue))
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                } else {
-                    Text("NT$\(String(format: "%.2f", currentDisplayPrice))")
-                        .font(.headline)
-                    Text(formatCurrency(totalValue))
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
+                if isLoading {
+                    ProgressView()
+                } else if let error = error {
+                    Text(error)
+                        .foregroundColor(.red)
+                } else { // Removed currentPrice check here as totalValue uses stockService directly
+                    if isUSStock {
+                        Text("$\(String(format: "%.2f", stockService.currentStockPrices[isUSStock ? asset.name : (asset.name.hasSuffix(".TW") ? asset.name : "\(asset.name).TW")] ?? 0))")
+                            .font(.headline)
+                        Text(formatCurrency(totalValue))
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    } else {
+                        Text("NT$\(String(format: "%.2f", stockService.currentStockPrices[isUSStock ? asset.name : (asset.name.hasSuffix(".TW") ? asset.name : "\(asset.name).TW")] ?? 0))")
+                            .font(.headline)
+                        Text(formatCurrency(totalValue))
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
                 }
             }
         }
-        // 移除 onAppear 和 onDisappear 區塊，現在 StockRowView 只需要觀察 stockService 的變化
-        // .onAppear {
-        //     fetchStockPrice()
-        // }
-        // .onDisappear {
-        //     cancelFetchTask()
-        // }
+        .onAppear {
+            // StockRowView only needs to trigger a fetch for its specific stock if not already available in StockService
+            // Or, ideally, AssetManager already handles the initial fetch for all assets.
+            // For now, let\'s keep fetchStockPrice() to ensure price is fetched for this row.
+            
+            //呼叫會造成第一次csv匯入時沒有更新實價
+            fetchStockPrice() // Ensure fetchStockPrice is called here.
+        }
+        .onDisappear {
+            //呼叫會造成第一次csv匯入時沒有更新實價
+            cancelFetchTask()
+        }
     }
 }
 
-// ... (StockEditView 保持原樣，因為它被註釋掉了)
-
-// #Preview {
-//     StockView()
-//         .environmentObject(AssetManager.shared)
-// }

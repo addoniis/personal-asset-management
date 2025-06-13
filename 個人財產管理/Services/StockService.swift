@@ -10,7 +10,7 @@ import SwiftUI
 class StockService: ObservableObject {
     static let shared = StockService()
 
-    @Published var usdExchangeRate: Double = 31.0  // 預設匯率
+    @Published var usdExchangeRate: Double = 30.1  // 預設匯率
     @Published var currentStockPrices: [String: Double] = [:]
     private var cancellables = Set<AnyCancellable>()
     private let yahooFinanceBaseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
