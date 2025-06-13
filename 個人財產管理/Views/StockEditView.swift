@@ -213,3 +213,15 @@ struct StockEditView: View {
         dismiss()
     }
 }
+
+
+#Preview {
+    NavigationStack { // 通常編輯或新增視圖會被包在 NavigationStack 裡面
+        StockEditView(
+            mode: .add, // 設定為新增模式
+            stockType: .taiwan, // 設定為台股類型
+            initialAsset: nil // 新增模式下不需要傳入初始資產
+        )
+        .environmentObject(AssetManager.shared) // 提供 AssetManager 環境物件
+    }
+}

@@ -105,9 +105,9 @@ struct AssetPieChartView: View {
     AssetPieChartView(
         data: [
             ("現金", 1000000, .blue),
+            ("保險", 500000, .orange),
             ("股票", 2000000, .green),
-            ("基金", 500000, .orange),
-            ("房地產", 3000000, .purple)
+            ("不動產", 3000000, .purple)
         ],
         total: 6500000
     )

@@ -264,9 +264,6 @@ struct StockRowView: View {
         return formatter.string(from: NSNumber(value: value))?.replacingOccurrences(of: "$", with: "NT$") ?? "NT$0"
     }
     
-    // 移除 fetchStockPrice() 和 cancelFetchTask() 函數，因為它們不再被使用
-    // private func cancelFetchTask() { ... }
-    // func fetchStockPrice() { ... }
 
     var body: some View {
         HStack {
@@ -297,19 +294,11 @@ struct StockRowView: View {
                 }
             }
         }
-        // 移除 onAppear 和 onDisappear 區塊，現在 StockRowView 只需要觀察 stockService 的變化
-        // .onAppear {
-        //     fetchStockPrice()
-        // }
-        // .onDisappear {
-        //     cancelFetchTask()
-        // }
     }
 }
 
-// ... (StockEditView 保持原樣，因為它被註釋掉了)
+#Preview {
+    StockView()
+        .environmentObject(AssetManager.shared)
+}
 
-// #Preview {
-//     StockView()
-//         .environmentObject(AssetManager.shared)
-// }
