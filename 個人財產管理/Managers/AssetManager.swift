@@ -34,18 +34,16 @@ class AssetManager: ObservableObject {
     }
 
     var totalAssets: Double {
-        let cashAssets = assets.filter { $0.category == .cash }.reduce(0) { $0 + $1.valueInTWD }
-        let stockAssets = calculateStockTotalValue()
-        let fundAssets = assets.filter { $0.category == .fund }.reduce(0) { $0 + $1.valueInTWD }
-        let insuranceAssets = assets.filter { $0.category == .insurance }.reduce(0) { $0 + $1.valueInTWD }
+        let cashAssets = assets.filter { $0.category == .cash }.reduce(0) { $0 + $1.valueInTWD }  //現金資產
+        let stockAssets = calculateStockTotalValue()  //股票資產
+        let fundAssets = assets.filter { $0.category == .fund }.reduce(0) { $0 + $1.valueInTWD }  //基金資產
+        let insuranceAssets = assets.filter { $0.category == .insurance }.reduce(0) { $0 + $1.valueInTWD } //保險資產
+        let propertyValue = assets.filter { $0.category == .property }.reduce(0) { $0 + $1.valueInTWD } //房產資產
+        let mortgageValue = assets.filter { $0.category == .mortgage }.reduce(0) { $0 + $1.valueInTWD } //房屋貸款
+        let realEstateNetValue = propertyValue - mortgageValue  //房屋淨資產
+        let otherAssets = assets.filter { $0.category == .other }.reduce(0) { $0 + $1.valueInTWD }  //其他
 
-        let propertyValue = assets.filter { $0.category == .property }.reduce(0) { $0 + $1.valueInTWD }
-        let mortgageValue = assets.filter { $0.category == .mortgage }.reduce(0) { $0 + $1.valueInTWD }
-        let realEstateNetValue = propertyValue - mortgageValue
-
-        let otherAssets = assets.filter { $0.category == .other }.reduce(0) { $0 + $1.valueInTWD }
-
-        return cashAssets + stockAssets + fundAssets + insuranceAssets + realEstateNetValue + otherAssets
+        return cashAssets + stockAssets + fundAssets + insuranceAssets + realEstateNetValue + otherAssets - mortgageValue
     }
 
     var totalCash: Double {
@@ -79,7 +77,7 @@ class AssetManager: ObservableObject {
             if asset.category == .property {
                 categorizedAssets[.property] = (categorizedAssets[.property] ?? 0) + asset.valueInTWD
             } else if asset.category == .mortgage {
-                categorizedAssets[.property] = (categorizedAssets[.property] ?? 0) - asset.valueInTWD
+                categorizedAssets[.mortgage] = (categorizedAssets[.mortgage] ?? 0) - asset.valueInTWD
             } else if asset.category == .stock {
                 guard let shares = asset.additionalInfo["shares"]?.double,
                       let stockMarket = asset.additionalInfo["stockMarket"]?.string else {
@@ -187,59 +185,37 @@ class AssetManager: ObservableObject {
         isLoading = false
     }
 
-//    @MainActor
-//    func fetchRealtimeStockPrices() async {
-//        for asset in assets.filter({ $0.category == .stock }) {
-//            guard let stockSymbol = asset.additionalInfo["symbol"]?.string ?? asset.name,
-//                  let isUSStock = asset.additionalInfo["isUSStock"]?.string == "true" else {
-//                continue
-//            }
-//            do {
-//                let price = try await (isUSStock
-//                    ? stockService.fetchUSStockPrice(symbol: stockSymbol)
-//                    : stockService.fetchTWStockPrice(symbol: stockSymbol))
-//            } catch {
-//                print("Error fetching price for \(stockSymbol) in AssetManager: \(error)")
-//            }
-//        }
-//    }
-//    @MainActor
-//    func fetchRealtimeStockPrices() async {
-//        for asset in assets.filter({ $0.category == .stock }) {
-//            // stockSymbol: 如果 additionalInfo 中有 symbol 且為 string，就用它，否則用 asset.name
-//            let stockSymbol = asset.additionalInfo?["symbol"]?.string ?? asset.name
-//
-//            // isUSStock: 判斷 additionalInfo 中 isUSStock 鍵的值是否為 "true"
-//            // 這裡不需要 guard let 或 else { continue }
-//            let isUSStock = (asset.additionalInfo?["isUSStock"]?.string == "true")
-//            // 注意：如果 additionalInfo?["isUSStock"]?.string 是 nil，這個比較結果會是 false，這是預期的行為。
-//            
-//            do {
-//                let price = try await (isUSStock
-//                    ? stockService.fetchUSStockPrice(symbol: stockSymbol)
-//                    : stockService.fetchTWStockPrice(symbol: stockSymbol))
-//                // price 現在在這裡可用
-//                // 你需要使用這個 price，例如更新 assetManager 中的資產
-//                // assetManager.updateAssetPrice(symbol: stockSymbol, newPrice: price) // 假設你有這樣的方法
-//                print("Fetched price for \(stockSymbol): \(price)")
-//            } catch {
-//                print("Error fetching price for \(stockSymbol) in AssetManager: \(error)")
-//            }
-//        }
-//    }
+
     @MainActor
     func fetchRealtimeStockPrices() async {
         for asset in assets.filter({ $0.category == .stock }) {
             // 修正 stockSymbol 的處理
             // 移除 asset.additionalInfo 後面的 "?"
             // 並使用 as? String 來安全地轉換為 String?
-            let stockSymbol = (asset.additionalInfo["symbol"] as? String) ?? asset.name
+//            let stockSymbol = (asset.additionalInfo["symbol"] as? String) ?? asset.name
+            let stockSymbol: String
+            if let symbolValue = asset.additionalInfo["symbol"], let symbolString = symbolValue.string {
+                stockSymbol = symbolString
+            } else {
+                stockSymbol = asset.name // 如果找不到或不是字串，則使用 asset.name 作為備用
+                print("Warning: additionalInfo[\"symbol\"] is missing or not a string type for asset: \(asset.name)")
+            }
 
             // 修正 isUSStock 的處理
             // 移除 asset.additionalInfo 後面的 "?"
             // 並使用 as? String 來安全地轉換為 String?
-            let isUSStock = (asset.additionalInfo["isUSStock"] as? String == "true")
-            
+//            let isUSStock = (asset.additionalInfo["isUSStock"] as? String == "true")
+            // 取得是否為美股 (isUSStock)
+
+            // 使用 AdditionalInfoValue 的 .string 便利訪問器
+            let isUSStock: Bool
+            if let isUSStockValue = asset.additionalInfo["isUSStock"], let usStockString = isUSStockValue.string {
+                isUSStock = (usStockString.lowercased() == "true") // 考慮大小寫不敏感
+            } else {
+                isUSStock = false // 如果找不到或不是字串 "true"，則預設為 false
+                print("Warning: additionalInfo[\"isUSStock\"] is missing or not a string 'true' for asset: \(asset.name)")
+            }
+
             do {
                 let price = try await (isUSStock
                     ? stockService.fetchUSStockPrice(symbol: stockSymbol)
@@ -255,6 +231,7 @@ class AssetManager: ObservableObject {
             }
         }
     }
+
     private func saveAssets() {
         do {
             try storageManager.saveAssets(assets)
@@ -448,6 +425,57 @@ class AssetManager: ObservableObject {
             }
         }
     }
+    // MARK: - loadEmbeddedSampleAssets
+    func loadEmbeddedSampleAssets() async {
+        let filename = "sample_assets"
+        let fileExtension = "csv"
+
+        guard let bundlePath = Bundle.main.path(forResource: filename, ofType: fileExtension) else {
+            print("DEBUG: Bundle.main.path returned nil for \(filename).\(fileExtension)")
+            print("Error: \(filename).\(fileExtension) not found in bundle.")
+            return
+        }
+
+        // 進行額外檢查：確認檔案是否存在於給定的路徑
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: bundlePath) {
+            print("DEBUG: FileManager reports file DOES NOT EXIST at path: \(bundlePath)")
+            print("Error: \(filename).\(fileExtension) not found in bundle, despite Bundle.main.path returning a path.")
+            return
+        }
+
+        print("DEBUG: File found at path: \(bundlePath)") // 如果能執行到這行，表示路徑獲取成功
+
+        do {
+            let csvString = try String(contentsOfFile: bundlePath, encoding: .utf8)
+            print("CSV Content Loaded Successfully from file.")
+
+            // 調用 CSVImporter 來解析 CSV 字串
+            let importedAssets = CSVImporter.importAssets(from: csvString)
+
+            // 在主線程上更新 assets 屬性
+            DispatchQueue.main.async { [weak self] in // 確保這裡有 [weak self] in
+                guard let self = self else { return }
+                self.assets = importedAssets
+                print("Successfully loaded \(self.assets.count) assets from CSV via CSVImporter.")
+            }
+
+        } catch {
+            print("Error loading CSV file: \(error.localizedDescription)")
+        }
+    }
+    // 您也可以添加一個函數來直接從內建的 generateSampleCSV 數據載入
+    func loadGeneratedSampleAssets() {
+        let csvString = CSVImporter.generateSampleCSV()
+        let importedAssets = CSVImporter.importAssets(from: csvString)
+
+        DispatchQueue.main.async {
+            self.assets = importedAssets
+            print("Successfully loaded \(self.assets.count) assets from generated CSV.")
+        }
+    }
+
+
 }
 
 // MARK: - Convenience Methods
@@ -483,3 +511,5 @@ extension AssetManager {
         objectWillChange.send()
     }
 }
+
+

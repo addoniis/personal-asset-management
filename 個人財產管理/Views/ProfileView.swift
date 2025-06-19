@@ -82,6 +82,16 @@ struct ProfileView: View {
                 }
 
                 Section(header: Text("資料管理")) {
+                    // 新增的「匯入範例CSV」按鈕
+//                    Button(action: {
+//                        Task { // 因為 loadEmbeddedSampleAssets 是 async，需要在 Task 中呼叫
+//                            await assetManager.loadEmbeddedSampleAssets()
+//                            importAlertMessage = "範例CSV資料匯入成功！"
+//                            showingImportAlert = true
+//                        }
+//                    }) {
+//                        Label("匯入範例CSV", systemImage: "doc.fill.badge.plus") // 選擇一個合適的圖標
+//                    }
                     Button(action: {
                         showingImportPicker = true
                     }) {
@@ -107,34 +117,6 @@ struct ProfileView: View {
             } message: {
                 Text("確定要重置所有用戶資料嗎？此操作無法撤銷。")
             }
-//            .fileImporter(
-//                isPresented: $showingImportPicker,
-//                allowedContentTypes: [.commaSeparatedText],
-//                allowsMultipleSelection: false
-//            ) { result in
-//                switch result {
-//                case .success(let files):
-//                    guard let selectedFile = files.first else { return }
-//
-//                    do {
-//                        let fileContent = try String(contentsOf: selectedFile, encoding: .utf8)
-//                        parsedAssets = CSVImporter.importAssets(from: fileContent)
-//                        if parsedAssets.isEmpty {
-//                            importAlertMessage = "CSV 解析失敗或無有效資料"
-//                            showingImportAlert = true
-//                        } else {
-//                            showReviewSheet = true
-//                        }
-//                    } catch {
-//                        importAlertMessage = "匯入失敗：\(error.localizedDescription)"
-//                        showingImportAlert = true
-//                    }
-//
-//                case .failure(let error):
-//                    importAlertMessage = "選擇檔案失敗：\(error.localizedDescription)"
-//                    showingImportAlert = true
-//                }
-//            }
             .fileImporter(
                 isPresented: $showingImportPicker,
                 allowedContentTypes: [.commaSeparatedText],
